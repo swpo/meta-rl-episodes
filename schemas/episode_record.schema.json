@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/meta/schemas/episode_record.schema.json",
+  "title": "Meta RL Research Episode Record",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "episode_id",
+    "title",
+    "created_at",
+    "research_question",
+    "environment",
+    "hosted_runs",
+    "findings",
+    "status"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "episode_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "model": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "research_question": { "type": "string" },
+    "hypotheses": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "environment": {
+      "type": "object",
+      "required": ["kind", "id", "env_args", "reward_summary"],
+      "properties": {
+        "kind": { "enum": ["hub", "local", "fork"] },
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "dashboard_url": { "type": "string" },
+        "local_path": { "type": "string" },
+        "entrypoint": { "type": "string" },
+        "env_args": { "type": "object" },
+        "dataset": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "split": { "type": "string" },
+            "source_url": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "prompt_summary": { "type": "string" },
+        "reward_summary": { "type": "string" },
+        "parser_assumptions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "known_risks": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "model_plan": {
+      "type": "object",
+      "properties": {
+        "default_probe_model": { "type": "string" },
+        "capability_probe_models": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "token_budget_notes": { "type": "string" },
+        "expected_cost_notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "eval_smokes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/eval_smoke" }
+    },
+    "hosted_runs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/hosted_run" }
+    },
+    "artifact_links": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact_link" }
+    },
+    "cost_summary": {
+      "type": "object",
+      "properties": {
+        "total_cost_usd": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "findings": {
+      "type": "object",
+      "required": ["summary", "success_criteria_met"],
+      "properties": {
+        "summary": { "type": "string" },
+        "success_criteria_met": { "type": "boolean" },
+        "lessons": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "failure_modes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reward_hacking_observed": { "type": "boolean" },
+        "reward_hacking_notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "next_steps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "status": { "enum": ["draft", "complete", "blocked"] }
+  },
+  "$defs": {
+    "eval_smoke": {
+      "type": "object",
+      "properties": {
+        "eval_id": { "type": "string" },
+        "command": { "type": "string" },
+        "model": { "type": "string" },
+        "max_tokens": { "type": "integer" },
+        "num_examples": { "type": "integer" },
+        "rollouts_per_example": { "type": "integer" },
+        "status": { "type": "string" },
+        "avg_reward": { "type": ["number", "null"] },
+        "avg_input_tokens": { "type": ["number", "null"] },
+        "avg_output_tokens": { "type": ["number", "null"] },
+        "truncation_rate": { "type": ["number", "null"] },
+        "error_rate": { "type": ["number", "null"] },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "hosted_run": {
+      "type": "object",
+      "required": ["run_id", "config_path", "status", "model"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "run_name": { "type": "string" },
+        "dashboard_url": { "type": "string" },
+        "config_path": { "type": "string" },
+        "status": { "type": "string" },
+        "model": { "type": "string" },
+        "env_id": { "type": "string" },
+        "env_version": { "type": "string" },
+        "max_steps": { "type": "integer" },
+        "batch_size": { "type": "integer" },
+        "rollouts_per_example": { "type": "integer" },
+        "max_tokens": { "type": "integer" },
+        "created_at": { "type": "string" },
+        "started_at": { "type": "string" },
+        "completed_at": { "type": "string" },
+        "stopped_manually": { "type": "boolean" },
+        "usage": { "$ref": "#/$defs/usage" },
+        "metrics_summary": { "$ref": "#/$defs/metrics_summary" },
+        "artifacts": {
+          "type": "object",
+          "properties": {
+            "checkpoints": { "type": "array" },
+            "rollout_steps": { "type": "array" },
+            "logs_collected": { "type": "boolean" }
+          },
+          "additionalProperties": true
+        },
+        "interpretation": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "training_tokens": { "type": "integer" },
+        "inference_input_tokens": { "type": "integer" },
+        "inference_output_tokens": { "type": "integer" },
+        "total_tokens": { "type": "integer" },
+        "total_cost_usd": { "type": "number" }
+      },
+      "additionalProperties": true
+    },
+    "metrics_summary": {
+      "type": "object",
+      "properties": {
+        "reward_mean": { "type": ["number", "null"] },
+        "reward_min": { "type": ["number", "null"] },
+        "reward_max": { "type": ["number", "null"] },
+        "zero_advantage_filter_rate": { "type": ["number", "null"] },
+        "effective_batch_size": { "type": ["number", "null"] },
+        "truncation_rate": { "type": ["number", "null"] },
+        "solve_all": { "type": ["number", "null"] },
+        "solve_none": { "type": ["number", "null"] },
+        "decode_len_mean": { "type": ["number", "null"] },
+        "prefill_len_mean": { "type": ["number", "null"] },
+        "seq_len_mean": { "type": ["number", "null"] },
+        "num_turns_mean": { "type": ["number", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "artifact_link": {
+      "type": "object",
+      "required": ["label", "kind", "url_or_path"],
+      "properties": {
+        "label": { "type": "string" },
+        "kind": {
+          "enum": [
+            "prime_dashboard",
+            "eval",
+            "checkpoint",
+            "local_file",
+            "external"
+          ]
+        },
+        "url_or_path": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

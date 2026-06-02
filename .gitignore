@@ -1,0 +1,11 @@
+# Local/generated evaluation outputs.
+outputs/
+
+# Python/editor noise.
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Local secrets.
+.env
+.env.*

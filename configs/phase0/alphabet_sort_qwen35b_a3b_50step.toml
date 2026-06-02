@@ -1,0 +1,27 @@
+# Phase 0 cost calibration: Qwen 35B-A3B on the same public, no-judge env.
+#
+# Goal: get an actual cost-per-step measurement for a larger, more capable
+# hosted-training model. This is the practical "when tiny models are not enough"
+# comparison point, and should scale toward the ~$10 budget envelope.
+
+model = "Qwen/Qwen3.5-35B-A3B"
+max_steps = 50
+batch_size = 128
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 256
+
+[[env]]
+id = "primeintellect/alphabet-sort"
+name = "alphabet_sort_cost_probe"
+
+[env.args]
+min_turns = 1
+max_turns = 2
+min_names_per_turn = 1
+max_names_per_turn = 4
+similarity_power = 4
+power_per_turn = true
+seed = 1337420
+

@@ -1,0 +1,115 @@
+schema_version: 0.1.0
+episode_id: "<YYYY-MM-DD-short-name>"
+title: "<short descriptive title>"
+created_at: "<ISO-8601 timestamp>"
+updated_at: "<ISO-8601 timestamp>"
+agent:
+  name: "<agent or thread name>"
+  model: "<agent model if known>"
+  notes: ""
+
+research_question: ""
+hypotheses: []
+
+environment:
+  kind: "hub" # hub | local | fork
+  id: ""
+  version: ""
+  dashboard_url: ""
+  local_path: ""
+  entrypoint: ""
+  env_args: {}
+  dataset:
+    name: ""
+    split: ""
+    source_url: ""
+  prompt_summary: ""
+  reward_summary: ""
+  parser_assumptions: []
+  tools: []
+  known_risks: []
+
+model_plan:
+  default_probe_model: "meta-llama/Llama-3.2-1B-Instruct"
+  capability_probe_models: []
+  token_budget_notes: ""
+  expected_cost_notes: ""
+
+eval_smokes: []
+# - eval_id: ""
+#   command: ""
+#   model: ""
+#   max_tokens: 0
+#   num_examples: 0
+#   rollouts_per_example: 0
+#   status: ""
+#   avg_reward: null
+#   avg_input_tokens: null
+#   avg_output_tokens: null
+#   truncation_rate: null
+#   error_rate: null
+#   notes: ""
+
+hosted_runs: []
+# - run_id: ""
+#   run_name: ""
+#   dashboard_url: ""
+#   config_path: ""
+#   status: ""
+#   model: ""
+#   env_id: ""
+#   env_version: ""
+#   max_steps: 0
+#   batch_size: 0
+#   rollouts_per_example: 0
+#   max_tokens: 0
+#   created_at: ""
+#   started_at: ""
+#   completed_at: ""
+#   stopped_manually: false
+#   usage:
+#     training_tokens: 0
+#     inference_input_tokens: 0
+#     inference_output_tokens: 0
+#     total_tokens: 0
+#     total_cost_usd: 0.0
+#   metrics_summary:
+#     reward_mean: null
+#     reward_min: null
+#     reward_max: null
+#     zero_advantage_filter_rate: null
+#     effective_batch_size: null
+#     truncation_rate: null
+#     solve_all: null
+#     solve_none: null
+#     decode_len_mean: null
+#     prefill_len_mean: null
+#     seq_len_mean: null
+#     num_turns_mean: null
+#   artifacts:
+#     checkpoints: []
+#     rollout_steps: []
+#     logs_collected: false
+#   interpretation: ""
+
+artifact_links: []
+# - label: ""
+#   kind: "prime_dashboard" # prime_dashboard | eval | checkpoint | local_file | external
+#   url_or_path: ""
+#   notes: ""
+
+cost_summary:
+  total_cost_usd: 0.0
+  notes: ""
+
+findings:
+  summary: ""
+  success_criteria_met: false
+  lessons: []
+  failure_modes: []
+  reward_hacking_observed: false
+  reward_hacking_notes: ""
+
+next_steps: []
+
+status: "draft" # draft | complete | blocked

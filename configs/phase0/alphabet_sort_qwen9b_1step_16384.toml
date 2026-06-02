@@ -1,0 +1,23 @@
+# Phase 0 diagnostic: check the mid-size Qwen option for agent guidance before
+# recommending costly 35B runs.
+
+model = "Qwen/Qwen3.5-9B"
+max_steps = 1
+batch_size = 128
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 16384
+
+[[env]]
+id = "primeintellect/alphabet-sort"
+name = "alphabet_sort_qwen9b_16384_smoke"
+
+[env.args]
+min_turns = 1
+max_turns = 2
+min_names_per_turn = 1
+max_names_per_turn = 4
+similarity_power = 4
+power_per_turn = true
+seed = 1337420
