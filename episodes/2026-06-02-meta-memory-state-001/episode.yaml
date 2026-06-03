@@ -1,0 +1,2220 @@
+schema_version: 0.1.0
+episode_id: "2026-06-02-meta-memory-state-001"
+title: "Meta memory state pocket-ledger environment"
+created_at: "2026-06-02T12:53:16-05:00"
+updated_at: "2026-06-03T16:01:45-05:00"
+agent:
+  name: "Codex"
+  model: "GPT-5 Codex"
+  notes: "Initial env scaffold was developed in a separate Codex session, then integrated and analyzed in this repo."
+
+research_question: "Can a cheap deterministic Verifiers environment produce a non-trivial RL signal for small-model ledger state tracking?"
+hypotheses:
+  - "Llama 1B should produce varied partial rewards because JSON format and arithmetic state tracking can fail independently."
+  - "Per-account shaped reward should avoid all-or-nothing zero-advantage batches on early probes."
+  - "Malformed outputs should receive low or partial reward without reward exceptions."
+
+environment:
+  kind: "hub"
+  id: "abugoot/meta-memory-state"
+  version: "0.6.0"
+  dashboard_url: "https://app.primeintellect.ai/dashboard/environments/abugoot/meta-memory-state"
+  local_path: "episodes/2026-06-02-meta-memory-state-001/env"
+  entrypoint: "meta_memory_state:load_environment"
+  hub:
+    owner: "abugoot"
+    name: "meta-memory-state"
+    environment_id: "zpywfmvxv4368q1djpuitp5t"
+    version_id: "jigzx1ag2fh2mqaibtjld9zd"
+    content_hash: "790e961cdfdb2817941e56f22c10477c859dcc40b8ce52072b2422953d8e8653"
+    wheel_sha256: "7f801e266c7d6660648af91d6646134bbb661eaf1e75612db49720a2e4b60a70"
+    pushed_at: "2026-06-03T00:34:47Z"
+    visibility: "PUBLIC"
+    action_status: "SUCCESS"
+  env_args:
+    seed: 1337420
+    num_examples: 128
+    min_turns: 1
+    max_turns: 2
+    account_count: 2
+  dataset:
+    name: "synthetic-pocket-ledger"
+    split: "generated"
+    source_url: ""
+  prompt_summary: "The successful smoke uses two tracked accounts, starting balances, and 1-2 debit/credit/transfer updates. The assistant must return the full ledger after every update."
+  reward_summary: "Average per-turn deterministic reward. v0.6 scores account balances, total, no extra accounts, JSON/tag format, stronger schema adherence for extra top-level/balances keys, and anti-stuffing penalties for multiple candidates, repeated tags, code fences, and long outputs. Missing, malformed, None outputs, dict messages, and Verifiers message objects are handled defensively."
+  parser_assumptions:
+    - "Preferred output is one <ledger>...</ledger> block containing JSON with balances and total."
+    - "Integer-like strings are accepted for balances."
+    - "A fallback key:value parser gives low shaped credit for non-JSON ledger-like output."
+  tools: []
+  known_risks:
+    - "The easier 1-2 turn / 2-account setting is useful for RL signal, and difficulty ablations through 4 accounts / 5-6 turns are now validated with completed runs."
+    - "Version 0.1.0 failed Prime integration because README.md was missing; version 0.1.1 fixed this and passed."
+    - "Versions 0.1.1-0.3.0 produced all-zero hosted rewards for different env/scoring reasons; these are preserved as diagnostic failures."
+    - "Models may optimize for total while hallucinating accounts; extra-account penalty is intentionally small but present."
+    - "Version 0.4.0 scores the best parseable candidate from verbose outputs; the 50-step run exploited this by emitting many ledger candidates and driving truncation near 97%."
+    - "Version 0.5.0 fixes the best-candidate loophole, but base Llama 1B reward is sparse before RL: about 4% parseable assistant turns in 32-example evals."
+    - "Version 0.5.0 Qwen 0.8B RL fixed the answer-stuffing behavior but exposed a smaller reward gap: extra keys inside balances and subtle two-turn arithmetic mistakes can still receive high partial reward."
+    - "Version 0.6.0 tightened schema penalties and completed a cheap 30-step Qwen run, but arithmetic/state mistakes can still receive moderate to high partial reward."
+    - "Normal prime eval run currently hangs for Qwen/Qwen3.5-0.8B on this env. The v0.5 adapter deployment timed out, the original v0.6 adapter deployment failed to load, and the v0.6 resume-regenerated adapter loaded only after a later redeploy retry. A second resume/restart attempt stalled twice at trainer checkpoint broadcast 26 and was stopped."
+
+model_plan:
+  default_probe_model: "Qwen/Qwen3.5-0.8B"
+  capability_probe_models:
+    - "meta-llama/Llama-3.2-1B-Instruct"
+  token_budget_notes: "The successful Llama smoke uses max_tokens=512. v0.4.0 averaged about 291 sequence tokens with 2.2% truncation at one step; after 50 RL steps, decode length rose sharply and truncation reached 96.9%. v0.5/v0.6 Qwen training used max_tokens=16384 to avoid Qwen hosted token-ceiling issues, but actual decode length stayed short: about 37-41 tokens at step 0 and 39-43 tokens at final steps."
+  expected_cost_notes: "One-step Llama 1B smokes on the easy 2-account setting cost about $0.008-$0.009 each. The v0.4 Llama 50-step follow-up cost $0.61 after the policy learned verbose answer stuffing. The v0.5 Qwen 0.8B 50-step run cost $0.07 for 1.16M training tokens, and the v0.6 Qwen 0.8B 30-step run cost $0.04 for 728.46K training tokens because anti-stuffing kept outputs short and Prime charged only the training bucket. Difficulty ablations with Qwen 0.8B cost $0.06 for 3 accounts / 2-3 turns, $0.08 for 3 accounts / 3-4 turns, $0.09 for 4 accounts / 3-4 turns, $0.05 for 4 accounts / 4-5 turns at batch 64, and $0.03 for 4 accounts / 5-6 turns at batch 32."
+
+eval_smokes:
+  - eval_id: "local-unit-tests"
+    command: "PYTHONDONTWRITEBYTECODE=1 python -B -m unittest discover -s episodes/2026-06-02-meta-memory-state-001/env -p 'test_*.py'"
+    model: ""
+    max_tokens: 0
+    num_examples: 16
+    rollouts_per_example: 0
+    status: "passed"
+    avg_reward: null
+    avg_input_tokens: null
+    avg_output_tokens: null
+    truncation_rate: null
+    error_rate: 0.0
+    notes: "Verified deterministic generation, exact reward, partial credit, malformed output handling, completion averaging, answer-signature scoring, dict messages, object-style Verifiers messages, fallback parsing, anti-stuffing penalties, diagnostics, and v0.6 schema-penalty regressions."
+  - eval_id: "import-syntax-check"
+    command: "PYTHONDONTWRITEBYTECODE=1 python -B -c \"import sys; sys.path.insert(0, 'episodes/2026-06-02-meta-memory-state-001/env'); import meta_memory_state\""
+    model: ""
+    max_tokens: 0
+    num_examples: 0
+    rollouts_per_example: 0
+    status: "passed"
+    avg_reward: null
+    avg_input_tokens: null
+    avg_output_tokens: null
+    truncation_rate: null
+    error_rate: 0.0
+    notes: "Import/syntax check passed on Python 3.13.5 with Verifiers imported lazily inside load_environment."
+
+evals:
+  - eval_id: "base-train-seed-v04-local-6fe2570b"
+    eval_type: "base-train"
+    command: "prime eval run abugoot/meta-memory-state@0.4.0 -m meta-llama/Llama-3.2-1B-Instruct -n 32 -r 1 -c 4 -a '{\"seed\":1337420,\"num_examples\":128,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 512 --temperature 0.7 --save-results --output-dir episodes/2026-06-02-meta-memory-state-001/evals/base_train_seed_v04 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.4.0"
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 1337420
+    split: "train-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/base_train_seed_v04/evals/meta-memory-state--meta-llama--Llama-3.2-1B-Instruct/6fe2570b/results.jsonl"
+    avg_reward: 0.08426846590909091
+    reward_std: 0.195872461627695
+    reward_min: 0.0
+    reward_max: 0.8690909090909091
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 207.0
+    avg_output_tokens: 55.0625
+    auxiliary_metrics:
+      parseable_turn_rate: 0.1836734693877551
+      exact_one_tag_turn_rate: 0.9795918367346939
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      mean_candidates_per_turn: 0.1836734693877551
+      mean_tags_per_turn: 0.9795918367346939
+      mean_output_chars_per_example: 173.03125
+    notes: "Base model on the original seed has low reward and low parseability, but no truncation or candidate stuffing. The eval completed and saved local results; the CLI returned nonzero only while attempting to upload from the default output path."
+  - eval_id: "base-heldout-seed-v04-local-0b1bf684"
+    eval_type: "base-heldout"
+    command: "prime eval run abugoot/meta-memory-state@0.4.0 -m meta-llama/Llama-3.2-1B-Instruct -n 32 -r 1 -c 4 -a '{\"seed\":424242,\"num_examples\":128,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 512 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/base_heldout_seed_v04 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.4.0"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/base_heldout_seed_v04/evals/meta-memory-state--meta-llama--Llama-3.2-1B-Instruct/0b1bf684/results.jsonl"
+    avg_reward: 0.02515625
+    reward_std: 0.10462346455713221
+    reward_min: 0.0
+    reward_max: 0.555
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 199.75
+    avg_output_tokens: 63.25
+    auxiliary_metrics:
+      parseable_turn_rate: 0.06382978723404255
+      exact_one_tag_turn_rate: 0.9361702127659575
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      mean_candidates_per_turn: 0.06382978723404255
+      mean_tags_per_turn: 1.1063829787234043
+      mean_output_chars_per_example: 197.03125
+    notes: "Base model held-out reward is lower than train-seed reward, still with no candidate stuffing or truncation."
+  - eval_id: "trained-train-seed-v04-local-a16445a5"
+    eval_type: "trained-train"
+    command: "prime eval run abugoot/meta-memory-state@0.4.0 -m meta-llama/Llama-3.2-1B-Instruct:lz4roaz2jmokl189l0bj7mqq -n 32 -r 1 -c 4 -a '{\"seed\":1337420,\"num_examples\":128,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 512 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/trained_train_seed_v04 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct:lz4roaz2jmokl189l0bj7mqq"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.4.0"
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 1337420
+    split: "train-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/trained_train_seed_v04/evals/meta-memory-state--meta-llama--Llama-3.2-1B-Instruct:lz4roaz2jmokl189l0bj7mqq/a16445a5/results.jsonl"
+    avg_reward: 0.7896156345025589
+    reward_std: 0.14015679748964444
+    reward_min: 0.5219298245614035
+    reward_max: 1.0
+    truncation_rate: 1.0
+    error_rate: 0.0
+    avg_input_tokens: 495.625
+    avg_output_tokens: 784.0
+    auxiliary_metrics:
+      parseable_turn_rate: 1.0
+      exact_one_tag_turn_rate: 0.02040816326530612
+      multi_candidate_turn_rate: 1.0
+      code_fence_turn_rate: 1.0
+      mean_candidates_per_turn: 13.142857142857142
+      mean_tags_per_turn: 5.0
+      mean_output_chars_per_example: 2058.0
+    notes: "Reward improves strongly on the original seed, but all examples truncate and every assistant turn contains multiple candidates and code fences."
+  - eval_id: "trained-heldout-seed-v04-local-d1f473fa"
+    eval_type: "trained-heldout"
+    command: "prime eval run abugoot/meta-memory-state@0.4.0 -m meta-llama/Llama-3.2-1B-Instruct:lz4roaz2jmokl189l0bj7mqq -n 32 -r 1 -c 4 -a '{\"seed\":424242,\"num_examples\":128,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 512 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/trained_heldout_seed_v04 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct:lz4roaz2jmokl189l0bj7mqq"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.4.0"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/trained_heldout_seed_v04/evals/meta-memory-state--meta-llama--Llama-3.2-1B-Instruct:lz4roaz2jmokl189l0bj7mqq/d1f473fa/results.jsonl"
+    avg_reward: 0.7820643794777526
+    reward_std: 0.13151657747762327
+    reward_min: 0.51
+    reward_max: 0.9600000000000001
+    truncation_rate: 1.0
+    error_rate: 0.0
+    avg_input_tokens: 453.125
+    avg_output_tokens: 752.0
+    auxiliary_metrics:
+      parseable_turn_rate: 1.0
+      exact_one_tag_turn_rate: 0.02127659574468085
+      exact_one_candidate_turn_rate: 0.0
+      exact_one_ledger_turn_rate: 0.0
+      multi_candidate_turn_rate: 1.0
+      code_fence_turn_rate: 1.0
+      mean_candidates_per_turn: 13.23404255319149
+      mean_tags_per_turn: 5.0638297872340425
+      mean_output_chars_per_example: 1958.40625
+    notes: "Same-reward improvement transfers to held-out seed, and the candidate-stuffing/truncation mechanism transfers too."
+  - eval_id: "base-train-seed-v05-local-d0522798"
+    eval_type: "base-train"
+    command: "prime eval run abugoot/meta-memory-state@0.5.0 -m meta-llama/Llama-3.2-1B-Instruct -n 32 -r 1 -c 4 -a '{\"seed\":1337420,\"num_examples\":128,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 512 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/base_train_seed_v05 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.5.0"
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 1337420
+    split: "train-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/base_train_seed_v05/evals/meta-memory-state--meta-llama--Llama-3.2-1B-Instruct/d0522798/results.jsonl"
+    avg_reward: 0.014843750000000001
+    reward_std: 0.08264650226075815
+    reward_min: 0.0
+    reward_max: 0.47500000000000003
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 207.4375
+    avg_output_tokens: 56.09375
+    auxiliary_metrics:
+      parseable_turn_rate: 0.04081632653061224
+      exact_one_tag_turn_rate: 1.0
+      exact_one_candidate_turn_rate: 0.04081632653061224
+      exact_one_ledger_turn_rate: 0.04081632653061224
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      mean_candidates_per_turn: 0.04081632653061224
+      mean_tags_per_turn: 1.0
+      mean_output_chars_per_example: 178.25
+    notes: "Base v0.5 reward is sparse but nonzero on the original seed. No truncation, code fences, or multi-candidate behavior before RL."
+  - eval_id: "base-heldout-seed-v05-local-fa2fdf29"
+    eval_type: "base-heldout"
+    command: "prime eval run abugoot/meta-memory-state@0.5.0 -m meta-llama/Llama-3.2-1B-Instruct -n 32 -r 1 -c 4 -a '{\"seed\":424242,\"num_examples\":128,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 512 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/base_heldout_seed_v05 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.5.0"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/base_heldout_seed_v05/evals/meta-memory-state--meta-llama--Llama-3.2-1B-Instruct/fa2fdf29/results.jsonl"
+    avg_reward: 0.01734375
+    reward_std: 0.0965659131678332
+    reward_min: 0.0
+    reward_max: 0.555
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 204.28125
+    avg_output_tokens: 78.125
+    auxiliary_metrics:
+      parseable_turn_rate: 0.0425531914893617
+      exact_one_tag_turn_rate: 0.8723404255319149
+      exact_one_candidate_turn_rate: 0.0425531914893617
+      exact_one_ledger_turn_rate: 0.0425531914893617
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      mean_candidates_per_turn: 0.0425531914893617
+      mean_tags_per_turn: 1.3829787234042554
+      mean_output_chars_per_example: 238.25
+    notes: "Held-out v0.5 base reward is also sparse but nonzero, with no truncation or candidate stuffing."
+  - eval_id: "base-heldout-seed-v06-llama1b-local-d011e013"
+    eval_type: "base-heldout"
+    command: "prime eval run abugoot/meta-memory-state@0.6.0 -m meta-llama/Llama-3.2-1B-Instruct -n 32 -r 1 -c 4 -a '{\"seed\":424242,\"num_examples\":128,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 512 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/base_heldout_seed_v06_llama1b --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/base_heldout_seed_v06_llama1b/evals/meta-memory-state--meta-llama--Llama-3.2-1B-Instruct/d011e013/results.jsonl"
+    avg_reward: 0.019036458333333336
+    reward_std: 0.10599051430283195
+    reward_min: 0.0
+    reward_max: 0.6091666666666667
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 198.21875
+    avg_output_tokens: 63.6875
+    auxiliary_metrics:
+      parseable_turn_rate: 0.0425531914893617
+      exact_one_tag_turn_rate: 0.9148936170212766
+      exact_one_candidate_turn_rate: 0.0425531914893617
+      exact_one_ledger_turn_rate: 0.0425531914893617
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      mean_candidates_per_turn: 0.0425531914893617
+      mean_tags_per_turn: 1.1702127659574468
+      mean_output_chars_per_example: 198.375
+    notes: "Base Llama 1B held-out eval on v0.6 completed and remained sparse but nonzero, matching the v0.5 base behavior. This confirms the v0.6 env/eval harness works for non-Qwen models."
+  - eval_id: "base-heldout-seed-v06-qwen08b-tiny-blocked"
+    eval_type: "base-heldout"
+    command: "prime eval run abugoot/meta-memory-state@0.6.0 -m Qwen/Qwen3.5-0.8B -n 3 -r 1 -c 1 -a '{\"seed\":424242,\"num_examples\":16,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 16384 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/base_heldout_seed_v06_qwen08b_tiny --abbreviated-summary --plain"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 16
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 16384
+    temperature: 0.7
+    num_examples: 3
+    rollouts_per_example: 1
+    status: "blocked"
+    output_path: ""
+    avg_reward: null
+    reward_std: null
+    reward_min: null
+    reward_max: null
+    truncation_rate: null
+    error_rate: null
+    avg_input_tokens: null
+    avg_output_tokens: null
+    auxiliary_metrics: {}
+    notes: "Hung for about 60 seconds with no stdout and no output directory; killed locally. This reproduces the Qwen eval-path issue seen on v0.5."
+  - eval_id: "trained-heldout-seed-v06-qwen08b-adapter-blocked"
+    eval_type: "trained-heldout"
+    command: "prime deployments create uuntogrnb6um3esp2c5nkk3d --yes --plain"
+    model: "Qwen/Qwen3.5-0.8B:uuntogrnb6um3esp2c5nkk3d"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 16384
+    temperature: 0.7
+    num_examples: 32
+    rollouts_per_example: 1
+    status: "blocked"
+    output_path: ""
+    avg_reward: null
+    reward_std: null
+    reward_min: null
+    reward_max: null
+    truncation_rate: null
+    error_rate: null
+    avg_input_tokens: null
+    avg_output_tokens: null
+    auxiliary_metrics: {}
+    notes: "Trained held-out Qwen eval was not launched because the v0.6 adapter deployment failed. Adapter uuntogrnb6um3esp2c5nkk3d is READY/deployable as an artifact, but deployment_status became DEPLOY_FAILED with error: Adapter failed to load."
+  - eval_id: "trained-heldout-seed-v06-qwen08b-resume-tiny"
+    eval_type: "trained-heldout"
+    command: "prime eval run abugoot/meta-memory-state@0.6.0 -m Qwen/Qwen3.5-0.8B:lsbgjt98s0d1nyv5eofomojx -n 3 -r 1 -c 1 -a '{\"seed\":424242,\"num_examples\":16,\"min_turns\":1,\"max_turns\":2,\"account_count\":2}' --max-tokens 16384 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/trained_heldout_seed_v06_qwen08b_resume_tiny --abbreviated-summary --plain"
+    model: "Qwen/Qwen3.5-0.8B:lsbgjt98s0d1nyv5eofomojx"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_turns: 1
+      max_turns: 2
+      account_count: 2
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 16384
+    temperature: 0.7
+    num_examples: 3
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/trained_heldout_seed_v06_qwen08b_resume_tiny/evals/meta-memory-state--Qwen--Qwen3.5-0.8B:lsbgjt98s0d1nyv5eofomojx/8d89104b/results.jsonl"
+    avg_reward: 0.9740416666666667
+    reward_std: 0.03671062705660161
+    reward_min: 0.922125
+    reward_max: 1.0
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 176.33333333333334
+    avg_output_tokens: 38.666666666666664
+    auxiliary_metrics:
+      assistant_turns: 4
+      parseable_turn_rate: 1.0
+      exact_one_ledger_turn_rate: 1.0
+      exact_one_candidate_turn_rate: 1.0
+      exact_one_tag_turn_rate: 1.0
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      mean_candidates_per_turn: 1.0
+      mean_tags_per_turn: 1.0
+      mean_output_chars_per_example: 93.66666666666667
+    notes: "Resume retry produced fresh READY adapter lsbgjt98s0d1nyv5eofomojx. Initial deployment timed out, but a June 3, 2026 redeploy reached DEPLOYED. A 3-example trained held-out eval completed with clean formatting and high reward; full 32-example eval remains to run."
+  - eval_id: "base-heldout-v06-6to7-qwen08b-run-t4kf6-n8"
+    eval_type: "base-heldout"
+    linked_hosted_run_id: "t4kf6tmab09foppeih32pvx6"
+    command: "prime eval run abugoot/meta-memory-state@0.6.0 -m Qwen/Qwen3.5-0.8B -n 8 -r 1 -c 1 -a '{\"seed\":424242,\"num_examples\":32,\"min_turns\":6,\"max_turns\":7,\"account_count\":4}' --max-tokens 16384 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/run_t4kf6tmab09foppeih32pvx6/base_heldout_seed424242_4acct_6to7_n8 --abbreviated-summary --plain"
+    model: "Qwen/Qwen3.5-0.8B"
+    adapter_id: null
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 32
+      min_turns: 6
+      max_turns: 7
+      account_count: 4
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 16384
+    temperature: 0.7
+    num_examples: 8
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_t4kf6tmab09foppeih32pvx6/base_heldout_seed424242_4acct_6to7_n8/evals/meta-memory-state--Qwen--Qwen3.5-0.8B/ff9dd043/results.jsonl"
+    summary_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_t4kf6tmab09foppeih32pvx6/base_heldout_seed424242_4acct_6to7_n8/summary.json"
+    avg_reward: 0.651465385229239
+    reward_std: 0.1825165855400241
+    reward_min: 0.31779761904761905
+    reward_max: 0.8781406455862978
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 2063.5
+    avg_output_tokens: 267.875
+    auxiliary_metrics:
+      assistant_turns: 50
+      parseable_turn_rate: 1.0
+      exact_one_ledger_turn_rate: 0.36
+      exact_one_candidate_turn_rate: 1.0
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.12
+      exact_turn_rate: 0.0
+      all_balances_exact_turn_rate: 0.02
+      total_exact_turn_rate: 0.04
+      account_exact_rate: 0.465
+      solve_all_examples_rate: 0.0
+    notes: "Run-scoped held-out baseline for the Qwen 0.8B 4-account / 6-7-turn RL run. Base model is parseable but rarely uses the exact ledger tag and does not solve any complete examples."
+  - eval_id: "trained-heldout-v06-6to7-qwen08b-run-t4kf6-n8"
+    eval_type: "trained-heldout"
+    linked_hosted_run_id: "t4kf6tmab09foppeih32pvx6"
+    command: "prime eval run abugoot/meta-memory-state@0.6.0 -m Qwen/Qwen3.5-0.8B:dsg66w80rcjhu3kkv0zpdzve -n 8 -r 1 -c 1 -a '{\"seed\":424242,\"num_examples\":32,\"min_turns\":6,\"max_turns\":7,\"account_count\":4}' --max-tokens 16384 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/run_t4kf6tmab09foppeih32pvx6/trained_heldout_seed424242_4acct_6to7_n8 --abbreviated-summary --plain"
+    model: "Qwen/Qwen3.5-0.8B:dsg66w80rcjhu3kkv0zpdzve"
+    adapter_id: "dsg66w80rcjhu3kkv0zpdzve"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 32
+      min_turns: 6
+      max_turns: 7
+      account_count: 4
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 16384
+    temperature: 0.7
+    num_examples: 8
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_t4kf6tmab09foppeih32pvx6/trained_heldout_seed424242_4acct_6to7_n8/evals/meta-memory-state--Qwen--Qwen3.5-0.8B:dsg66w80rcjhu3kkv0zpdzve/e000b512/results.jsonl"
+    summary_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_t4kf6tmab09foppeih32pvx6/trained_heldout_seed424242_4acct_6to7_n8/summary.json"
+    avg_reward: 0.8618528415061391
+    reward_std: 0.05719001300941907
+    reward_min: 0.7725235478806908
+    reward_max: 0.929034090909091
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 2112.125
+    avg_output_tokens: 282.625
+    auxiliary_metrics:
+      assistant_turns: 50
+      parseable_turn_rate: 1.0
+      exact_one_ledger_turn_rate: 1.0
+      exact_one_candidate_turn_rate: 1.0
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      exact_turn_rate: 0.06
+      all_balances_exact_turn_rate: 0.32
+      total_exact_turn_rate: 0.12
+      account_exact_rate: 0.765
+      solve_all_examples_rate: 0.0
+    notes: "Trained Qwen 0.8B improves reward and fixes formatting on held-out 6-7 turn examples, but exact turn correctness remains low and no full examples are solved."
+  - eval_id: "base-heldout-v06-6to7-qwen2b-run-wc5nvp-n8"
+    eval_type: "base-heldout"
+    linked_hosted_run_id: "wc5nvpymcd093n8x9c7yedgt"
+    command: "prime eval run abugoot/meta-memory-state@0.6.0 -m Qwen/Qwen3.5-2B -n 8 -r 1 -c 1 -a '{\"seed\":424242,\"num_examples\":32,\"min_turns\":6,\"max_turns\":7,\"account_count\":4}' --max-tokens 16384 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/run_wc5nvpymcd093n8x9c7yedgt/base_heldout_seed424242_4acct_6to7_n8 --abbreviated-summary --plain"
+    model: "Qwen/Qwen3.5-2B"
+    adapter_id: null
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 32
+      min_turns: 6
+      max_turns: 7
+      account_count: 4
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 16384
+    temperature: 0.7
+    num_examples: 8
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_wc5nvpymcd093n8x9c7yedgt/base_heldout_seed424242_4acct_6to7_n8/evals/meta-memory-state--Qwen--Qwen3.5-2B/41a7d6b3/results.jsonl"
+    summary_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_wc5nvpymcd093n8x9c7yedgt/base_heldout_seed424242_4acct_6to7_n8/summary.json"
+    avg_reward: 0.7277569425290471
+    reward_std: 0.2619002858254574
+    reward_min: 0.10428571428571429
+    reward_max: 0.9760016025641026
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 2066.75
+    avg_output_tokens: 268.25
+    auxiliary_metrics:
+      assistant_turns: 50
+      parseable_turn_rate: 0.88
+      exact_one_ledger_turn_rate: 0.86
+      exact_one_candidate_turn_rate: 0.88
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.12
+      exact_turn_rate: 0.1
+      all_balances_exact_turn_rate: 0.24
+      total_exact_turn_rate: 0.16
+      account_exact_rate: 0.575
+      solve_all_examples_rate: 0.0
+    notes: "Run-scoped held-out baseline for the Qwen 2B 4-account / 6-7-turn RL run. Base 2B is stronger than base 0.8B but still noisy and occasionally malformed."
+  - eval_id: "trained-heldout-v06-6to7-qwen2b-run-wc5nvp-n8"
+    eval_type: "trained-heldout"
+    linked_hosted_run_id: "wc5nvpymcd093n8x9c7yedgt"
+    command: "prime eval run abugoot/meta-memory-state@0.6.0 -m Qwen/Qwen3.5-2B:ym5npd2cye3h2zfey3746say -n 8 -r 1 -c 1 -a '{\"seed\":424242,\"num_examples\":32,\"min_turns\":6,\"max_turns\":7,\"account_count\":4}' --max-tokens 16384 --temperature 0.7 --save-results --skip-upload --output-dir episodes/2026-06-02-meta-memory-state-001/evals/run_wc5nvpymcd093n8x9c7yedgt/trained_heldout_seed424242_4acct_6to7_n8 --abbreviated-summary --plain"
+    model: "Qwen/Qwen3.5-2B:ym5npd2cye3h2zfey3746say"
+    adapter_id: "ym5npd2cye3h2zfey3746say"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    env_args:
+      seed: 424242
+      num_examples: 32
+      min_turns: 6
+      max_turns: 7
+      account_count: 4
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 16384
+    temperature: 0.7
+    num_examples: 8
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_wc5nvpymcd093n8x9c7yedgt/trained_heldout_seed424242_4acct_6to7_n8/evals/meta-memory-state--Qwen--Qwen3.5-2B:ym5npd2cye3h2zfey3746say/70050276/results.jsonl"
+    summary_path: "episodes/2026-06-02-meta-memory-state-001/evals/run_wc5nvpymcd093n8x9c7yedgt/trained_heldout_seed424242_4acct_6to7_n8/summary.json"
+    avg_reward: 0.9554565780080486
+    reward_std: 0.03918973240506303
+    reward_min: 0.880319264069264
+    reward_max: 0.9967592592592593
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 2063.625
+    avg_output_tokens: 266.0
+    auxiliary_metrics:
+      assistant_turns: 50
+      parseable_turn_rate: 1.0
+      exact_one_ledger_turn_rate: 1.0
+      exact_one_candidate_turn_rate: 1.0
+      multi_candidate_turn_rate: 0.0
+      code_fence_turn_rate: 0.0
+      exact_turn_rate: 0.42
+      all_balances_exact_turn_rate: 0.7
+      total_exact_turn_rate: 0.46
+      account_exact_rate: 0.91
+      solve_all_examples_rate: 0.0
+    notes: "Trained Qwen 2B gives the strongest held-out result: high shaped reward, clean formatting, and much better exact balance/total tracking, but still no fully solved examples in this n=8 slice."
+
+hosted_runs:
+  - run_id: "rdair5n0ca531bxqqvetrok8"
+    run_name: "meta-memory---llama-3.2-1b--rdair5"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/rdair5n0ca531bxqqvetrok8"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_1step_smoke.toml"
+    status: "completed"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.1.1"
+    max_steps: 1
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    created_at: "2026-06-02T18:30:00Z"
+    started_at: "2026-06-02T18:30:00Z"
+    completed_at: "2026-06-02T18:32:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 93990
+      inference_input_tokens: 416080
+      inference_output_tokens: 185400
+      total_tokens: 695470
+      total_cost_usd: 0.03
+    metrics_summary:
+      reward_mean: 0.0
+      reward_min: 0.0
+      reward_max: 0.0
+      zero_advantage_filter_rate: 0.9375
+      effective_batch_size: 0.0
+      truncation_rate: 0.125
+      solve_all: 0.0
+      solve_none: 1.0
+      decode_len_mean: 467.56666666666666
+      prefill_len_mean: 252.19166666666663
+      seq_len_mean: 661.8958333333334
+      num_turns_mean: 3.0
+    artifacts:
+      checkpoints: []
+      rollout_steps: [0]
+      distributions_steps: [0]
+      logs_collected: true
+      rollout_samples_logged: 64
+    interpretation: "Prime hosted training integration works, but the initial Llama 1B smoke produced all-zero rewards and 93.75% zero-advantage filtering. Samples show the model copied the placeholder account schema, emitted many ledger blocks, and often put useful-looking balances outside the required tag."
+  - run_id: "mngozs87cvyj745q8zaqph9k"
+    run_name: "meta-memory---llama-3.2-1b--mngozs"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/mngozs87cvyj745q8zaqph9k"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_1step_smoke_v02.toml"
+    status: "completed"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.2.0"
+    max_steps: 1
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    created_at: "2026-06-02T20:34:00Z"
+    started_at: "2026-06-02T20:34:00Z"
+    completed_at: "2026-06-02T20:35:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 39470
+      inference_input_tokens: 91420
+      inference_output_tokens: 63080
+      total_tokens: 193970
+      total_cost_usd: 0.008
+    metrics_summary:
+      reward_mean: 0.0
+      reward_min: 0.0
+      reward_max: 0.0
+      zero_advantage_filter_rate: 0.9765625
+      effective_batch_size: 0.0
+      truncation_rate: 0.0390625
+      solve_all: 0.0
+      solve_none: 1.0
+      decode_len_mean: 164.6015625
+      prefill_len_mean: 143.75
+      seq_len_mean: 308.3515625
+      num_turns_mean: 1.25
+    artifacts:
+      checkpoints: []
+      rollout_steps: [0]
+      distributions_steps: [0]
+      logs_collected: true
+      rollout_samples_logged: 64
+    interpretation: "v0.2.0 fixed the confusing placeholder schema, reduced prompt difficulty to two accounts and 1-2 turns, and scored best JSON-like candidates locally. Hosted reward still stayed all zero, revealing a reward interface bug rather than pure task difficulty."
+  - run_id: "qh9lqxz5v3s82sjfs03cso8h"
+    run_name: "meta-memory---llama-3.2-1b--qh9lqx"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/qh9lqxz5v3s82sjfs03cso8h"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_1step_smoke_v03.toml"
+    status: "completed"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.3.0"
+    max_steps: 1
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    created_at: "2026-06-02T20:38:00Z"
+    started_at: "2026-06-02T20:38:00Z"
+    completed_at: "2026-06-02T20:40:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 37220
+      inference_input_tokens: 92500
+      inference_output_tokens: 74300
+      total_tokens: 204020
+      total_cost_usd: 0.0085
+    metrics_summary:
+      reward_mean: 0.0
+      reward_min: 0.0
+      reward_max: 0.0
+      zero_advantage_filter_rate: 0.984375
+      effective_batch_size: 0.0
+      truncation_rate: 0.020833333333333332
+      solve_all: 0.0
+      solve_none: 1.0
+      decode_len_mean: 152.859375
+      prefill_len_mean: 143.58333333333334
+      seq_len_mean: 296.4427083333333
+      num_turns_mean: 1.25
+    artifacts:
+      checkpoints: []
+      rollout_steps: [0]
+      distributions_steps: [0]
+      logs_collected: true
+      rollout_samples_logged: 64
+    interpretation: "v0.3.0 changed the reward function from state-shaped local scoring to the hosted Verifiers answer signature. Hosted reward still stayed all zero. Comparing rollout samples to local scoring showed that stored dict-shaped samples would receive partial credit, pointing to object-style Verifiers messages during scoring."
+  - run_id: "msisq47uw7tcnvuxn5aejrbg"
+    run_name: "meta-memory---llama-3.2-1b--msisq4"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/msisq47uw7tcnvuxn5aejrbg"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_1step_smoke_v04.toml"
+    status: "completed"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.4.0"
+    max_steps: 1
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    created_at: "2026-06-02T20:49:00Z"
+    started_at: "2026-06-02T20:50:00Z"
+    completed_at: "2026-06-02T20:51:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 37050
+      inference_input_tokens: 94710
+      inference_output_tokens: 73030
+      total_tokens: 204800
+      total_cost_usd: 0.0085
+    metrics_summary:
+      reward_mean: 0.342616458165434
+      reward_min: 0.2125
+      reward_max: 0.6175
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.022321428571428572
+      solve_all: 0.0
+      solve_none: 0.0
+      decode_len_mean: 150.38839285714286
+      prefill_len_mean: 140.85714285714286
+      seq_len_mean: 291.2455357142857
+      num_turns_mean: 1.1428571428571428
+    artifacts:
+      checkpoints: []
+      rollout_steps: []
+      distributions_steps: [0]
+      logs_collected: true
+      rollout_samples_logged: 0
+    interpretation: "v0.4.0 made score_completion accept both dict messages and Verifiers AssistantMessage objects. The same one-step Llama 1B smoke finally produced non-zero reward variance, effective_batch_size 1.0, and no zero-advantage filtering. The run used --skip-action-check because the v0.4 integration action was still running, but the action later completed SUCCESS."
+  - run_id: "wpw270lopu0vrzyfx9otn6w1"
+    run_name: "meta-memory---llama-3.2-1b--wpw270"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/wpw270lopu0vrzyfx9otn6w1"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_50step_v04.toml"
+    status: "completed"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.4.0"
+    max_steps: 50
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    created_at: "2026-06-02T21:02:00Z"
+    started_at: "2026-06-02T21:02:00Z"
+    completed_at: "2026-06-02T21:20:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 5290000
+      inference_input_tokens: 2840000
+      inference_output_tokens: 3950000
+      total_tokens: 12080000
+      total_cost_usd: 0.61
+    metrics_summary:
+      reward_mean: 0.7793022234461967
+      reward_min: 0.5801223776223776
+      reward_max: 0.926015625
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.96875
+      solve_all: 0.0
+      solve_none: 0.0
+      decode_len_mean: 653.3928571428571
+      prefill_len_mean: 231.35714285714286
+      seq_len_mean: 797.9642857142857
+      num_turns_mean: 1.2857142857142858
+    artifacts:
+      checkpoints:
+        - "10:t6r9odwqtqmmb6ttd0qbaqzh"
+        - "20:k0lrv5pt9qlqmozjuonaolud"
+        - "30:j6xr82lpq15wvr5mfkjof8p9"
+        - "40:h2s6hy7gg9o4v3my0q20tden"
+      rollout_steps: [0, 10, 20, 30, 40]
+      distributions_steps: [0, 10, 20, 30, 40]
+      logs_collected: true
+      rollout_samples_logged: 320
+    interpretation: "The 50-step Llama 1B run optimized the shaped reward from about 0.39 at step 0 to 0.78 at step 49, while effective_batch_size stayed 1.0 and zero_advantage stayed 0. However, samples show reward hacking: the model emits many candidate ledgers and code fences, often truncating, so the best-candidate parser can award high reward to one near-matching candidate rather than one coherent answer."
+  - run_id: "ovhe41qu43r1i3gwo98lw0mq"
+    run_name: "meta-memory-state-llama1b-v05-renderer-fail"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/ovhe41qu43r1i3gwo98lw0mq"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_50step_v05.toml"
+    status: "failed"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.5.0"
+    max_steps: 50
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    created_at: "2026-06-02T22:19:00Z"
+    started_at: "2026-06-02T22:19:00Z"
+    completed_at: "2026-06-02T22:20:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 0
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 0
+      total_cost_usd: 0.0
+    metrics_summary:
+      reward_mean: null
+      reward_min: null
+      reward_max: null
+      zero_advantage_filter_rate: null
+      effective_batch_size: null
+      truncation_rate: null
+      solve_all: null
+      solve_none: null
+      decode_len_mean: null
+      prefill_len_mean: null
+      seq_len_mean: null
+      num_turns_mean: null
+    artifacts:
+      checkpoints: []
+      rollout_steps: []
+      distributions_steps: []
+      logs_collected: true
+      rollout_samples_logged: 0
+    interpretation: "Llama v0.5 failed before training because hosted renderer auto-validation does not map meta-llama/Llama-3.2-1B-Instruct. The explicit run_config renderer override was admin-only, and the sprints mirror failed the free-tier env check."
+  - run_id: "t06x036p2njx21ts5fi5p4vm"
+    run_name: "meta-memory---qwen3.5-0.8b--t06x03"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/t06x036p2njx21ts5fi5p4vm"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_50step_v05.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.5.0"
+    max_steps: 50
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-02T22:23:00Z"
+    started_at: "2026-06-02T22:23:00Z"
+    completed_at: "2026-06-02T22:41:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 1160000
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 1160000
+      total_cost_usd: 0.07
+    metrics_summary:
+      reward_mean: 0.9360820637695638
+      reward_min: null
+      reward_max: null
+      best_reward_mean: 0.9929465553977272
+      best_reward_step: 47
+      zero_advantage_filter_rate: 0.75
+      effective_batch_size: 0.4
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 0.9916666666666668
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 43.46
+      prefill_len_mean: null
+      seq_len_mean: 179.19166666666666
+      num_turns_mean: null
+    artifacts:
+      checkpoints:
+        - "25:xeepq0hs9j2n10vax391h27x"
+        - "30:zwien63xjtwzkzy48b243995"
+        - "35:qexxugmcjk7gi9ome0h1c2le"
+        - "40:ot6uwlx195sspoka9rzspxu2"
+        - "45:nyxpe3xu3i4zzt2cp90ludvl"
+      rollout_steps: [0, 20, 30, 40]
+      distributions_steps: [0, 10, 20, 30, 40]
+      logs_collected: true
+      rollout_samples_logged: 256
+    interpretation: "The v0.5 anti-stuffing reward worked for Qwen 0.8B: reward rose from 0.451 at step 0 to a best step of 0.993 and final 0.936, while truncation stayed 0.0 and multi-candidate/code-fence behavior went to 0.0. Rising zero-advantage filtering suggests the easy setting saturates by roughly 20-30 steps. Samples exposed a smaller schema/partial-credit loophole targeted by v0.6."
+  - run_id: "fdzqzv4ridlnhond78eghitd"
+    run_name: "meta-memory---qwen3.5-0.8b--fdzqzv"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/fdzqzv4ridlnhond78eghitd"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T00:35:00Z"
+    started_at: "2026-06-03T00:36:00Z"
+    completed_at: "2026-06-03T00:45:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 728460
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 728460
+      total_cost_usd: 0.04
+    metrics_summary:
+      reward_mean: 0.9157058046120546
+      reward_min: null
+      reward_max: null
+      best_reward_mean: 0.9890944602272728
+      best_reward_step: 25
+      zero_advantage_filter_rate: 0.75
+      effective_batch_size: 0.4375
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 1.0
+      multi_candidate_rate: null
+      code_fence_rate: null
+      mean_candidate_count: null
+      decode_len_mean: 39.52
+      prefill_len_mean: null
+      seq_len_mean: null
+      num_turns_mean: null
+    artifacts:
+      checkpoints:
+        - "5:dgtbytfkys3ewmww5ldx447w"
+        - "10:vooc7y4i367egdavwj3dhlwl"
+        - "15:tjcx5scgt7sl8jvl80mk4bp2"
+        - "20:oay64borfhmd6a9p5vttlt1e"
+        - "25:vs01hyx5vxxbn431rb3qj22v"
+        - "30:oc078rsfvphlq2r08njn9o9e:uploading-when-checked"
+      rollout_steps: [0, 10, 20]
+      distributions_steps: [0, 10, 20]
+      logs_collected: true
+      rollout_samples_logged: 192
+    interpretation: "The v0.6 schema-penalty run preserved clean anti-stuffing behavior and was cheaper than the v0.5 50-step probe: reward rose from 0.543 at step 0 to a best step of 0.989 at step 25 and final 0.916, exact-one-ledger reached 1.0, and truncation stayed 0.0. Qualitative samples show the remaining issue has shifted to arithmetic/state fidelity under shaped partial credit rather than formatting."
+  - run_id: "jspr0dm70xv1nzv2jkz8u8ug"
+    run_name: "meta-memory---qwen3.5-0.8b--jspr0d"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/jspr0dm70xv1nzv2jkz8u8ug"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_resume_from25_retry.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    checkpoint_id: "vs01hyx5vxxbn431rb3qj22v"
+    resumed_from_step: 25
+    created_at: "2026-06-03T01:28:00Z"
+    started_at: "2026-06-03T01:28:00Z"
+    completed_at: "2026-06-03T01:31:00Z"
+    stopped_manually: false
+    usage:
+      training_tokens: 111750
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 111750
+      total_cost_usd: 0.0067
+    metrics_summary:
+      reward_mean: 0.9587472098214288
+      reward_min: 0.6000000000000001
+      reward_max: 1.0
+      best_reward_mean: 0.9608333333333332
+      best_reward_step: 28
+      zero_advantage_filter_rate: 0.8125
+      effective_batch_size: 0.1875
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 1.0
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 41.5390625
+      prefill_len_mean: 132.4375
+      seq_len_mean: 173.9765625
+      num_turns_mean: 1.4375
+    artifacts:
+      checkpoints:
+        - "25:ykoqriy9kluvxwo2zksxwiyi"
+        - "30:x47ww0spp9qdbxgjzl8a8a0j:uploading-when-checked"
+      final_adapter: "lsbgjt98s0d1nyv5eofomojx"
+      rollout_steps: []
+      distributions_steps: []
+      logs_collected: true
+      rollout_samples_logged: 0
+    interpretation: "The resume retry successfully trained from the original v0.6 step-25 checkpoint to the same step-30 endpoint for $0.0067 and regenerated a fresh READY final adapter. Training metrics stayed clean: final logged reward 0.959, parseable 1.0, exact-one-ledger 1.0, no truncation, no multi-candidate behavior, and no code fences. Initial deployment timed out, but a later redeploy reached DEPLOYED and one-shot inference returned a normal greeting."
+  - run_id: "pnm7mpulnx3j8y1oyjz2sxwx"
+    run_name: "meta-memory---qwen3.5-0.8b--pnm7mp"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/pnm7mpulnx3j8y1oyjz2sxwx"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_resume_retry2_from25.toml"
+    status: "stopped"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    checkpoint_id: "ykoqriy9kluvxwo2zksxwiyi"
+    resumed_from_step: 25
+    created_at: "2026-06-03T14:46:00Z"
+    started_at: "2026-06-03T14:54:00Z"
+    completed_at: "2026-06-03T14:58:00Z"
+    stopped_manually: true
+    usage:
+      training_tokens: 44850
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 44850
+      total_cost_usd: 0.0027
+    metrics_summary:
+      reward_mean: 0.9544027777777778
+      reward_min: 0.6000000000000001
+      reward_max: 1.0
+      best_reward_mean: 0.9689034598214286
+      best_reward_step: 25
+      zero_advantage_filter_rate: 0.75
+      effective_batch_size: 0.33333333333333337
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 1.0
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 39.74166666666667
+      prefill_len_mean: 131.2
+      seq_len_mean: 170.94166666666666
+      num_turns_mean: 1.4
+    artifacts:
+      checkpoints:
+        - "25:m1gaxcecx4y5pjt9x685kxhv"
+      final_adapter: ""
+      rollout_steps: []
+      distributions_steps: []
+      logs_collected: true
+      rollout_samples_logged: 0
+    interpretation: "The second resume retry did not reach a final adapter. It resumed from the first retry's READY step-25 checkpoint, completed rollout steps 25 and 26, then paused waiting for trainer checkpoint 26. Prime's native train restart from latest checkpoint repeated the same stall, so the run was stopped after $0.0027. The env-server was healthy and idle during the stall, pointing to trainer/resume behavior rather than env scoring."
+  - run_id: "uvzzmvybz365g0qqgwbo2san"
+    run_name: "meta-memory---qwen3.5-0.8b--uvzzmv"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/uvzzmvybz365g0qqgwbo2san"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_3acct_2to3.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    checkpoint_id: ""
+    resumed_from_step: null
+    created_at: "2026-06-03T15:59:00Z"
+    started_at: "2026-06-03T15:59:00Z"
+    completed_at: "2026-06-03T16:09:00Z"
+    stopped_manually: false
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 2
+      max_turns: 3
+      account_count: 3
+    usage:
+      training_tokens: 1070000
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 1070000
+      total_cost_usd: 0.06
+    metrics_summary:
+      reward_mean: 0.9509105913720869
+      reward_min: 0.8627604166666667
+      reward_max: 1.0
+      best_reward_mean: 0.9509105913720869
+      best_reward_step: 29
+      zero_advantage_filter_rate: 0.0625
+      effective_batch_size: 0.9285714285714286
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 1.0
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 86.60267857142857
+      prefill_len_mean: 176.92857142857142
+      seq_len_mean: 263.53125
+      num_turns_mean: 2.4285714285714284
+      comparison_points:
+        step_0:
+          reward_mean: 0.5726165339697441
+          parseable_turn_rate: 0.9506944444444444
+          exact_one_ledger_rate: 0.22083333333333333
+          code_fence_rate: 0.1625
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 267.3875
+        step_10:
+          reward_mean: 0.8168624683120287
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.9296875
+          code_fence_rate: 0.0
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 273.0078125
+        step_20:
+          reward_mean: 0.874947018114987
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.9817708333333333
+          code_fence_rate: 0.0
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 268.359375
+    artifacts:
+      checkpoints:
+        - "5:mafbcb6at9x5hamfk6pj7dx7"
+        - "10:u4b5u03efpun0gmxcyz3mx97"
+        - "15:k36fgxl8veok08e22d9hz4bs"
+        - "20:oklaohgp4v0y5u4yzk7vhcr7"
+        - "25:cdkv8zpjojecika5aobdf0tl"
+      final_adapter: "q5bqdxys3dmb0it2zruvhxw0"
+      rollout_steps: [0, 20]
+      distributions_steps: [0, 10, 20]
+      logs_collected: true
+      rollout_samples_logged: 128
+    interpretation: "This first difficulty ablation kept Qwen 0.8B training params fixed and only increased env args from 2 accounts / 1-2 turns to 3 accounts / 2-3 turns. Reward rose from 0.573 at step 0 to 0.951 at step 29, but the trajectory was noisier than the easy setting and final solve_all remained only 0.071. Formatting became clean by step 10, while qualitative samples still show arithmetic/state mistakes receiving high partial credit. This is a better difficulty rung for later compute/model ablations, though the small model still reaches high shaped reward."
+  - run_id: "xvpykb8rxhq1kzg5wtnm9ty6"
+    run_name: "meta-memory---qwen3.5-0.8b--xvpyk"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/xvpykb8rxhq1kzg5wtnm9ty6"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_3acct_3to4.toml"
+    status: "stopped"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    checkpoint_id: ""
+    resumed_from_step: null
+    created_at: "2026-06-03T16:17:00Z"
+    started_at: "2026-06-03T16:18:00Z"
+    completed_at: "2026-06-03T16:26:00Z"
+    stopped_manually: true
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 3
+      max_turns: 4
+      account_count: 3
+    usage:
+      training_tokens: 87450
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 87450
+      total_cost_usd: 0.0052
+    metrics_summary:
+      reward_mean: 0.5315476775122119
+      reward_min: 0.38714814814814813
+      reward_max: 0.6939484126984127
+      best_reward_mean: 0.5601001385466762
+      best_reward_step: 0
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.0
+      parseable_turn_rate: 0.9496527777777778
+      exact_one_ledger_rate: 0.271875
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.1652777777777778
+      mean_candidate_count: 0.9496527777777778
+      decode_len_mean: 130.525
+      prefill_len_mean: 211.66666666666666
+      seq_len_mean: 342.19166666666666
+      num_turns_mean: 3.533333333333333
+      comparison_points:
+        step_0:
+          reward_mean: 0.5601001385466762
+          parseable_turn_rate: 0.9729166666666667
+          exact_one_ledger_rate: 0.2979166666666666
+          code_fence_rate: 0.12291666666666666
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 337.48333333333335
+        step_1:
+          reward_mean: 0.5315476775122119
+          parseable_turn_rate: 0.9496527777777778
+          exact_one_ledger_rate: 0.271875
+          code_fence_rate: 0.1652777777777778
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 342.19166666666666
+    artifacts:
+      checkpoints: []
+      final_adapter: ""
+      rollout_steps: [0]
+      distributions_steps: [0]
+      logs_collected: true
+      rollout_samples_logged: 64
+    interpretation: "First 3-account / 3-4 turn attempt made it through steps 0 and 1 with useful baseline reward, then waited at trainer checkpoint broadcast 1 for about 5.5 minutes and was stopped for $0.0052. Because a fresh retry of the same config completed, this is logged as a platform/trainer hiccup plus partial baseline data rather than an env failure."
+  - run_id: "xn4ncn6hfi6pexy78mtt5cen"
+    run_name: "meta-memory---qwen3.5-0.8b--xn4ncn"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/xn4ncn6hfi6pexy78mtt5cen"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_3acct_3to4.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    checkpoint_id: ""
+    resumed_from_step: null
+    created_at: "2026-06-03T16:27:00Z"
+    started_at: "2026-06-03T16:27:00Z"
+    completed_at: "2026-06-03T16:39:00Z"
+    stopped_manually: false
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 3
+      max_turns: 4
+      account_count: 3
+    usage:
+      training_tokens: 1410000
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 1410000
+      total_cost_usd: 0.08
+    metrics_summary:
+      reward_mean: 0.8789023116123035
+      reward_min: 0.7177672371031747
+      reward_max: 0.9953125
+      best_reward_mean: 0.8789023116123035
+      best_reward_step: 29
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 0.9979166666666667
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 124.24583333333334
+      prefill_len_mean: 209.4
+      seq_len_mean: 333.6458333333333
+      num_turns_mean: 3.466666666666667
+      solve_all: 0.0
+      comparison_points:
+        step_0:
+          reward_mean: 0.5656548140818844
+          parseable_turn_rate: 0.9798177083333333
+          exact_one_ledger_rate: 0.16536458333333331
+          code_fence_rate: 0.13736979166666666
+          multi_candidate_rate: 0.001953125
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 329.28125
+        step_3:
+          reward_mean: 0.7553217322704014
+          parseable_turn_rate: 0.9609375
+          exact_one_ledger_rate: 0.8131510416666666
+          multi_candidate_rate: 0.013671875
+          truncation_rate: 0.0078125
+          zero_advantage_filter_rate: 0.0625
+          seq_len_mean: 649.046875
+        step_10:
+          reward_mean: 0.8037053132911465
+          parseable_turn_rate: 0.986235119047619
+          exact_one_ledger_rate: 0.9185267857142857
+          multi_candidate_rate: 0.05282738095238095
+          code_fence_rate: 0.008928571428571428
+          seq_len_mean: 338.2857142857143
+        step_20:
+          reward_mean: 0.8573635551439598
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.9877232142857143
+          multi_candidate_rate: 0.0
+          code_fence_rate: 0.0
+          seq_len_mean: 324.9017857142857
+        step_29:
+          reward_mean: 0.8789023116123035
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.9979166666666667
+          multi_candidate_rate: 0.0
+          code_fence_rate: 0.0
+          seq_len_mean: 333.6458333333333
+          solve_all: 0.0
+    artifacts:
+      checkpoints:
+        - "5:rsqu3xv8niucvpaam0fyysuj"
+        - "10:a386ggoxjgrtrtgp3v4mns5j"
+        - "15:b0upu6ai5v40mqhoiy7h025g"
+        - "20:z0hum4gt6nvugzwrpa517j3l"
+        - "25:mx6bjnru2d3phcohfwc1h8q3"
+      final_adapter: "aqpu5vg4x6wmsbfhxi1q9wp1"
+      rollout_steps: [0, 20]
+      distributions_steps: [0, 10, 20]
+      logs_collected: true
+      rollout_samples_logged: 128
+    interpretation: "The 3-account / 3-4 turn retry is materially harder than the 2-3 turn rung: final reward reached 0.879 rather than 0.951, final solve_all stayed 0.0, and step-20 samples still had wrong state arithmetic despite clean formatting. Early training briefly showed a length/multi-candidate spike before settling back to short exact-one-ledger outputs. This is the first difficulty setting in the episode that looks appropriate for later model-size or compute/batch ablations."
+  - run_id: "epzwm0i1cbluvcx27ya4caan"
+    run_name: "meta-memory---qwen3.5-0.8b--epzwm"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/epzwm0i1cbluvcx27ya4caan"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_3to4.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    checkpoint_id: ""
+    resumed_from_step: null
+    created_at: "2026-06-03T16:52:00Z"
+    started_at: "2026-06-03T16:52:00Z"
+    completed_at: "2026-06-03T17:05:00Z"
+    stopped_manually: false
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 3
+      max_turns: 4
+      account_count: 4
+    usage:
+      training_tokens: 1450000
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 1450000
+      total_cost_usd: 0.09
+    metrics_summary:
+      reward_mean: 0.8647283446514182
+      reward_min: 0.7118630952380952
+      reward_max: 0.9779231770833333
+      best_reward_mean: 0.8891048002607564
+      best_reward_step: 20
+      zero_advantage_filter_rate: 0.0625
+      effective_batch_size: 1.0
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 0.998046875
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 153.3046875
+      prefill_len_mean: 228.625
+      seq_len_mean: 381.9296875
+      num_turns_mean: 3.625
+      solve_all: 0.0
+      comparison_points:
+        step_0:
+          reward_mean: 0.5637636906154431
+          parseable_turn_rate: 0.9715277777777779
+          exact_one_ledger_rate: 0.19166666666666668
+          code_fence_rate: 0.1826388888888889
+          multi_candidate_rate: 0.008333333333333333
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 389.5833333333333
+        step_5:
+          reward_mean: 0.7748639087596736
+          parseable_turn_rate: 0.990625
+          exact_one_ledger_rate: 0.646875
+          code_fence_rate: 0.008333333333333333
+          multi_candidate_rate: 0.0
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 358.40416666666664
+        step_10:
+          reward_mean: 0.830426897888599
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.9954427083333333
+          code_fence_rate: 0.0
+          multi_candidate_rate: 0.0026041666666666665
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 365.1015625
+        step_20:
+          reward_mean: 0.8891048002607564
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 1.0
+          code_fence_rate: 0.0
+          multi_candidate_rate: 0.0
+          zero_advantage_filter_rate: 0.0
+          seq_len_mean: 364.3828125
+          solve_all: 0.0
+        step_29:
+          reward_mean: 0.8647283446514182
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.998046875
+          multi_candidate_rate: 0.0
+          code_fence_rate: 0.0
+          seq_len_mean: 381.9296875
+          solve_all: 0.0
+    artifacts:
+      checkpoints:
+        - "5:f8rhxq0zgl45w1zl56c6lt0p"
+        - "10:hn8ugbbo7p2nbs8bk33tvfvq"
+        - "15:x82qk7zuiw554ffnv5ki9o0p"
+        - "20:ffg4642wm0tz3kyjck2clcl6"
+        - "25:nd9fa56207170mksy8y8n0si"
+        - "30:w704mo9oi3c1xkhs1rcfvpkv:uploading"
+      final_adapter: "ebi25offqrl587fnfp55bffx"
+      rollout_steps: [20]
+      distributions_steps: [0, 10, 20]
+      logs_collected: true
+      rollout_samples_logged: 128
+    interpretation: "Increasing width from 3 to 4 accounts at the same 3-4 turn depth did not produce a sharp degradation for Qwen 0.8B. Final reward reached 0.865, slightly below the 3-account / 3-4-turn retry's 0.879, while parseability stayed 1.0, exact-one-ledger stayed near 1.0, and solve_all stayed 0.0. Step-20 samples show high shaped reward despite wrong totals and sometimes a wrong final balance, so the remaining useful difficulty axis is exact arithmetic/state fidelity rather than output format."
+  - run_id: "jvwvglhzbp2h8abmhtkgf6ri"
+    run_name: "meta-memory---qwen3.5-0.8b--jvwvgl"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/jvwvglhzbp2h8abmhtkgf6ri"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_4to5.toml"
+    status: "stopped"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T17:12:47Z"
+    started_at: "2026-06-03T17:13:23Z"
+    completed_at: "2026-06-03T17:19:15Z"
+    stopped_manually: true
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 4
+      max_turns: 5
+      account_count: 4
+    usage:
+      training_tokens: 116640
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 116640
+      total_cost_usd: 0.007
+    metrics_summary:
+      reward_mean: 0.6076
+      best_reward_mean: 0.6076
+      best_reward_step: 1
+      seq_len_mean: 455.2
+      comparison_points:
+        step_0:
+          reward_mean: 0.5703
+          seq_len_mean: 456.3
+        step_1:
+          reward_mean: 0.6076
+          seq_len_mean: 455.2
+    artifacts:
+      checkpoints: []
+      rollout_steps: [0]
+      distributions_steps: [0]
+      logs_collected: true
+      rollout_samples_logged: 64
+    interpretation: "First batch-128 4-account / 4-5 turn attempt produced healthy step-0 and step-1 rewards, then stalled waiting for trainer checkpoint broadcast 1 and was stopped."
+  - run_id: "ylzr995pao3587n4xgjnrj1r"
+    run_name: "meta-memory---qwen3.5-0.8b--ylzr99"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/ylzr995pao3587n4xgjnrj1r"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_4to5.toml"
+    status: "stopped"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T17:20:37Z"
+    started_at: "2026-06-03T17:21:23Z"
+    completed_at: "2026-06-03T17:27:53Z"
+    stopped_manually: true
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 4
+      max_turns: 5
+      account_count: 4
+    usage:
+      training_tokens: 116030
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 116030
+      total_cost_usd: 0.0069
+    metrics_summary:
+      reward_mean: 0.5866650997284006
+      reward_min: 0.4172839516929282
+      reward_max: 0.722987293956044
+      best_reward_mean: 0.598536240160926
+      best_reward_step: 0
+      truncation_rate: 0.0
+      parseable_turn_rate: 0.9566964285714287
+      exact_one_ledger_rate: 0.19598214285714285
+      multi_candidate_rate: 0.005580357142857143
+      code_fence_rate: 0.2158482142857143
+      seq_len_mean: 462.67857142857144
+      solve_all: 0.0
+      comparison_points:
+        step_0:
+          reward_mean: 0.598536240160926
+          exact_one_ledger_rate: 0.264453125
+          code_fence_rate: 0.15234375
+          seq_len_mean: 444.9296875
+        step_1:
+          reward_mean: 0.5866650997284006
+          exact_one_ledger_rate: 0.19598214285714285
+          code_fence_rate: 0.2158482142857143
+          seq_len_mean: 462.67857142857144
+    artifacts:
+      checkpoints: []
+      rollout_steps: [0]
+      distributions_steps: [0]
+      logs_collected: true
+      rollout_samples_logged: 64
+    interpretation: "Second batch-128 4-account / 4-5 turn attempt repeated the checkpoint-broadcast-1 stall. Because the batch-64 version completed, this is logged as trainer/batch handling rather than env failure."
+  - run_id: "zhc48qkatvucpcaqvsekd9sm"
+    run_name: "meta-memory---qwen3.5-0.8b--zhc48q"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/zhc48qkatvucpcaqvsekd9sm"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_4to5_b64.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 64
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T17:28:27Z"
+    started_at: "2026-06-03T17:28:36Z"
+    completed_at: "2026-06-03T17:38:36Z"
+    stopped_manually: false
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 4
+      max_turns: 5
+      account_count: 4
+    usage:
+      training_tokens: 868450
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 868450
+      total_cost_usd: 0.05
+    metrics_summary:
+      reward_mean: 0.8945494355467472
+      reward_min: 0.81965625
+      reward_max: 0.9749035470350009
+      best_reward_mean: 0.8945494355467472
+      best_reward_step: 29
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 1.0
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 178.953125
+      prefill_len_mean: 246.25
+      seq_len_mean: 425.203125
+      num_turns_mean: 4.25
+      solve_all: 0.0
+      comparison_points:
+        step_0:
+          reward_mean: 0.5661
+          parseable_turn_rate: 0.99296875
+          exact_one_ledger_rate: 0.24765625
+          code_fence_rate: 0.16953125
+          multi_candidate_rate: 0.00390625
+          decode_len_mean: 197.390625
+          seq_len_mean: 449.0
+        step_5:
+          reward_mean: 0.6781737570211379
+          parseable_turn_rate: 0.9671875000000001
+          exact_one_ledger_rate: 0.9140625
+          code_fence_rate: 0.0
+          seq_len_mean: 473.40625
+        step_10:
+          reward_mean: 0.8143514303628239
+          parseable_turn_rate: 0.9921875
+          exact_one_ledger_rate: 0.9921875
+          code_fence_rate: 0.0
+          seq_len_mean: 440.296875
+        step_20:
+          reward_mean: 0.8553601176605203
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.996875
+          code_fence_rate: 0.0
+          seq_len_mean: 433.84375
+          solve_all: 0.0
+        step_29:
+          reward_mean: 0.8945494355467472
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 1.0
+          code_fence_rate: 0.0
+          seq_len_mean: 425.203125
+          solve_all: 0.0
+    artifacts:
+      checkpoints:
+        - "5:n76qene09qjhpj2m2aritbff"
+        - "10:a5q0kzvdknx43chvwhyzy971"
+        - "15:yrbjyxxzpx5k2l9a4ed3b1wb"
+        - "20:ghdsz3nypx629ed0rs9sdlne"
+        - "25:wwht3hl184jyfm8ljgn0u2i6"
+        - "30:bsaggzj09bu6tt8ln775988e:uploading"
+      final_adapter: ""
+      rollout_steps: [0, 20]
+      distributions_steps: [10, 20]
+      logs_collected: true
+      rollout_samples_logged: 64
+    interpretation: "Batch 64 cleared the trainer checkpoint stall and completed the 4-account / 4-5 turn rung. The model still reached high shaped reward with perfect final formatting, but final solve_all stayed 0.0 and sampled ledgers still had wrong totals or occasional wrong balances."
+  - run_id: "rzu3o8g5dro2qol7qbfbti1y"
+    run_name: "meta-memory---qwen3.5-0.8b--rzu3o8"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/rzu3o8g5dro2qol7qbfbti1y"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_5to6_b64.toml"
+    status: "stopped"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 64
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T17:41:16Z"
+    started_at: "2026-06-03T17:41:29Z"
+    completed_at: "2026-06-03T17:47:00Z"
+    stopped_manually: true
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 5
+      max_turns: 6
+      account_count: 4
+    usage:
+      training_tokens: 0
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 0
+      total_cost_usd: 0.0
+    metrics_summary:
+      reward_mean: null
+      latest_step: null
+      solve_all: null
+    artifacts:
+      checkpoints: []
+      rollout_steps: []
+      distributions_steps: []
+      logs_collected: true
+      rollout_samples_logged: 0
+    interpretation: "The 4-account / 5-6 turn batch-64 attempt reached orchestrator step 0 but did not complete a logged rollout batch, then was stopped with $0 usage. It is superseded by the completed batch-32 retry and should not be interpreted as a model/task failure."
+  - run_id: "o4qsl2ttfmlnf07bba1uo4qg"
+    run_name: "meta-memory---qwen3.5-0.8b--o4qsl2"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/o4qsl2ttfmlnf07bba1uo4qg"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_5to6_b32.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 32
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T18:38:00Z"
+    started_at: "2026-06-03T18:38:00Z"
+    completed_at: "2026-06-03T18:48:00Z"
+    stopped_manually: false
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 5
+      max_turns: 6
+      account_count: 4
+    usage:
+      training_tokens: 539655
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 539655
+      total_cost_usd: 0.03
+    metrics_summary:
+      reward_mean: 0.8482998431182124
+      reward_min: 0.7945682692307693
+      reward_max: 0.9383213292626992
+      best_reward_mean: 0.8482998431182124
+      best_reward_step: 29
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.0
+      parseable_turn_rate: 0.96875
+      exact_one_ledger_rate: 0.96875
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 0.96875
+      decode_len_mean: 248.8125
+      prefill_len_mean: 293.0
+      seq_len_mean: 541.8125
+      num_turns_mean: 5.75
+      solve_all: 0.0
+      comparison_points:
+        step_0:
+          reward_mean: 0.5675466672038133
+          parseable_turn_rate: 0.96875
+          exact_one_ledger_rate: 0.1875
+          code_fence_rate: 0.109375
+          multi_candidate_rate: 0.0
+          decode_len_mean: 248.8125
+          seq_len_mean: 534.5625
+        step_5:
+          reward_mean: 0.6580724497521796
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 0.9625
+          code_fence_rate: 0.0
+          seq_len_mean: 519.1875
+        step_10:
+          reward_mean: 0.7638335081338897
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 1.0
+          code_fence_rate: 0.0
+          seq_len_mean: 485.46875
+        step_20:
+          reward_mean: 0.7772368209770553
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 1.0
+          code_fence_rate: 0.0
+          seq_len_mean: 533.03125
+          solve_all: 0.0
+        step_29:
+          reward_mean: 0.8482998431182124
+          parseable_turn_rate: 0.96875
+          exact_one_ledger_rate: 0.96875
+          code_fence_rate: 0.0
+          seq_len_mean: 541.8125
+          solve_all: 0.0
+    artifacts:
+      checkpoints:
+        - "5:jgqcni75a42hq2wl0n32uipl"
+        - "10:vng9skx9w55vv7g170x5txqv"
+        - "15:kmxnunmvkdsarvym78h1rmvq"
+        - "20:il9g9z808ex1porlnt8vid4k"
+        - "25:o5clccll0p03wnbn88fk0cor"
+        - "30:ps46j02lp2tkffpsshjy50l0:uploading"
+      final_adapter: ""
+      rollout_steps: [0, 20]
+      distributions_steps: [0, 10, 20]
+      logs_collected: true
+      rollout_samples_logged: 32
+    interpretation: "Batch 32 completed the 4-account / 5-6 turn rung cheaply. Reward improved from 0.568 to 0.848 and formatting mostly recovered, but final solve_all stayed 0.0 and sampled rollouts still showed large-transfer state errors plus total drift."
+  - run_id: "t4kf6tmab09foppeih32pvx6"
+    run_name: "meta-memory---qwen3.5-0.8b--t4kf6t"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/t4kf6tmab09foppeih32pvx6"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_6to7_b32.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-0.8B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 32
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T19:02:00Z"
+    started_at: "2026-06-03T19:02:00Z"
+    completed_at: "2026-06-03T19:26:00Z"
+    stopped_manually: false
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 6
+      max_turns: 7
+      account_count: 4
+    usage:
+      training_tokens: 2700000
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 2700000
+      total_cost_usd: 0.16
+    metrics_summary:
+      reward_mean: 0.712872081309708
+      reward_min: 0.5905303030303031
+      reward_max: 0.8171664299597414
+      best_reward_mean: 0.8285
+      best_reward_step: 28
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.0
+      parseable_turn_rate: 0.9910714285714286
+      exact_one_ledger_rate: 0.9910714285714286
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 0.9910714285714286
+      decode_len_mean: 291.53125
+      prefill_len_mean: 318.0
+      seq_len_mean: 609.53125
+      num_turns_mean: 6.5
+      solve_all: 0.0
+      comparison_points:
+        step_0:
+          reward_mean: 0.5685569523100943
+          parseable_turn_rate: 0.9635416666666666
+          exact_one_ledger_rate: 0.2708333333333333
+          code_fence_rate: 0.2760416666666667
+          multi_candidate_rate: 0.0
+          truncation_rate: 0.0
+          decode_len_mean: 281.40625
+          seq_len_mean: 592.90625
+          solve_all: 0.0
+        step_9:
+          reward_mean: 0.5145199724775591
+          parseable_turn_rate: 0.9729166666666667
+          exact_one_ledger_rate: 0.6324404761904762
+          multi_candidate_rate: 0.3092261904761905
+          mean_candidate_count: 25.25141369047619
+          repetition_filter_rate: 0.25
+          truncation_rate: 0.21875
+          generation_truncated_rate: 0.0625
+          prompt_too_long_rate: 0.15625
+          decode_len_mean: 14394.28125
+          seq_len_mean: 14693.78125
+          solve_all: 0.0
+        step_10:
+          reward_mean: 0.6753691732814295
+          parseable_turn_rate: 0.953125
+          exact_one_ledger_rate: 0.8313988095238095
+          multi_candidate_rate: 0.10476190476190475
+          repetition_filter_rate: 0.15625
+          truncation_rate: 0.15625
+          generation_truncated_rate: 0.03125
+          prompt_too_long_rate: 0.125
+          decode_len_mean: 10186.96875
+          seq_len_mean: 10496.96875
+          solve_all: 0.0
+        step_20:
+          reward_mean: 0.8013082788021759
+          parseable_turn_rate: 0.9947916666666667
+          exact_one_ledger_rate: 0.9947916666666667
+          code_fence_rate: 0.0
+          multi_candidate_rate: 0.0
+          truncation_rate: 0.0
+          decode_len_mean: 283.65625
+          seq_len_mean: 601.15625
+          solve_all: 0.0
+        step_29:
+          reward_mean: 0.712872081309708
+          parseable_turn_rate: 0.9910714285714286
+          exact_one_ledger_rate: 0.9910714285714286
+          code_fence_rate: 0.0
+          multi_candidate_rate: 0.0
+          truncation_rate: 0.0
+          decode_len_mean: 291.53125
+          seq_len_mean: 609.53125
+          solve_all: 0.0
+    artifacts:
+      checkpoints:
+        - "5:hmgjs08outxgt3dsfe67petw"
+        - "10:sh8j5is53v6y2tj6s89smsp7"
+        - "15:l7qoz7ropjf0tl1wfezf5wrl"
+        - "20:z1vqw7t825bsuc98chke1zpx"
+        - "25:y9iapv4l73xz6qd00p144vqv"
+        - "30:q7yeyda5oyu0z6lf8nss7jrn:uploading"
+      final_adapter: ""
+      rollout_steps: [0, 10, 20]
+      distributions_steps: [0, 10]
+      logs_collected: true
+      rollout_samples_logged: 32
+    interpretation: "This is the first clear small-model stress trace for the env. Qwen 0.8B learns clean formatting, but 4 accounts / 6-7 turns triggers a mid-run length/repetition/multi-candidate spike around steps 8-16 and ends with lower/noisier shaped reward at 0.713. Samples still make transfer-state and total errors under high partial reward."
+  - run_id: "wc5nvpymcd093n8x9c7yedgt"
+    run_name: "meta-memory---qwen3.5-2b--wc5nvp"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/wc5nvpymcd093n8x9c7yedgt"
+    config_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen2b_30step_v06_diff_4acct_6to7_b32.toml"
+    status: "completed"
+    model: "Qwen/Qwen3.5-2B"
+    env_id: "abugoot/meta-memory-state"
+    env_version: "0.6.0"
+    max_steps: 30
+    batch_size: 32
+    rollouts_per_example: 8
+    max_tokens: 16384
+    created_at: "2026-06-03T19:29:00Z"
+    started_at: "2026-06-03T19:30:00Z"
+    completed_at: "2026-06-03T19:41:00Z"
+    stopped_manually: false
+    env_args:
+      seed: 1337420
+      num_examples: 128
+      min_turns: 6
+      max_turns: 7
+      account_count: 4
+    usage:
+      training_tokens: 562680
+      inference_input_tokens: 0
+      inference_output_tokens: 0
+      total_tokens: 562680
+      total_cost_usd: 0.08
+    metrics_summary:
+      reward_mean: 0.9568215485128669
+      reward_min: 0.9292869897959184
+      reward_max: 0.9873400297619048
+      best_reward_mean: 0.9568215485128669
+      best_reward_step: 29
+      zero_advantage_filter_rate: 0.0
+      effective_batch_size: 1.0
+      truncation_rate: 0.0
+      parseable_turn_rate: 1.0
+      exact_one_ledger_rate: 1.0
+      multi_candidate_rate: 0.0
+      code_fence_rate: 0.0
+      mean_candidate_count: 1.0
+      decode_len_mean: 268.7083333333333
+      prefill_len_mean: 310.0
+      seq_len_mean: 578.7083333333334
+      num_turns_mean: 6.5
+      solve_all: 0.0
+      comparison_points:
+        step_0:
+          reward_mean: 0.713148972703735
+          parseable_turn_rate: 0.96875
+          exact_one_ledger_rate: 0.9166666666666666
+          code_fence_rate: 0.25
+          multi_candidate_rate: 0.0
+          truncation_rate: 0.0
+          decode_len_mean: 292.25
+          seq_len_mean: 601.25
+          solve_all: 0.0
+        step_10:
+          reward_mean: 0.9207685808446917
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 1.0
+          code_fence_rate: 0.0
+          multi_candidate_rate: 0.0
+          truncation_rate: 0.0
+          decode_len_mean: 268.1875
+          seq_len_mean: 575.9375
+          solve_all: 0.0
+        step_20:
+          reward_mean: 0.9120034045815296
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 1.0
+          code_fence_rate: 0.0
+          multi_candidate_rate: 0.0
+          truncation_rate: 0.0
+          decode_len_mean: 256.03125
+          seq_len_mean: 555.53125
+          solve_all: 0.0
+        step_29:
+          reward_mean: 0.9568215485128669
+          parseable_turn_rate: 1.0
+          exact_one_ledger_rate: 1.0
+          code_fence_rate: 0.0
+          multi_candidate_rate: 0.0
+          truncation_rate: 0.0
+          decode_len_mean: 268.7083333333333
+          seq_len_mean: 578.7083333333334
+          solve_all: 0.0
+    artifacts:
+      checkpoints:
+        - "10:tdd4d5nwww3u3y4gh00fx6z5"
+        - "15:ptt0pry8bk17mtk2yd1n5joy"
+        - "20:s7hrmpsr5f2zpczw1mw29y3t"
+        - "25:s0x751zonvs1mmwiiykzpkls"
+        - "30:y40v7ydq727rjfbgkwg2cdix"
+      final_adapter: ""
+      rollout_steps: [0, 10, 20]
+      distributions_steps: [0, 10, 20]
+      logs_collected: true
+      rollout_samples_logged: 32
+    interpretation: "The matched Qwen 2B run gives a strong scaling signal. It starts higher, avoids the 0.8B length/repetition spike, stays short and format-clean, and reaches final reward 0.957 for only $0.08 because token usage stays low. solve_all remains 0.0, so full exact state tracking is still unsolved."
+
+artifact_links:
+  - label: "local env module"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/env/meta_memory_state.py"
+    notes: "Self-contained deterministic scaffold with Verifiers entrypoint."
+  - label: "local unit tests"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/env/test_meta_memory_state.py"
+    notes: "Tests parsing, reward, malformed outputs, and deterministic generation."
+  - label: "prepared Llama 1B smoke config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_1step_smoke.toml"
+    notes: "Used for completed hosted run rdair5n0ca531bxqqvetrok8."
+  - label: "successful Llama 1B smoke config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_1step_smoke_v04.toml"
+    notes: "Used for completed hosted run msisq47uw7tcnvuxn5aejrbg."
+  - label: "50-step Llama 1B run config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_50step_v04.toml"
+    notes: "Used for completed hosted run wpw270lopu0vrzyfx9otn6w1."
+  - label: "50-step Llama 1B v0.5 anti-stuffing config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/llama1b_50step_v05.toml"
+    notes: "Blocked reference config; meta-llama path failed renderer validation and sprints mirror failed free-tier env checks."
+  - label: "50-step Qwen 0.8B v0.5 anti-stuffing config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_50step_v05.toml"
+    notes: "Used for completed hosted run t06x036p2njx21ts5fi5p4vm."
+  - label: "30-step Qwen 0.8B v0.6 schema-penalty config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06.toml"
+    notes: "Used for completed hosted run fdzqzv4ridlnhond78eghitd."
+  - label: "30-step Qwen 0.8B v0.6 resume retry config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_resume_from25_retry.toml"
+    notes: "Used for completed hosted run jspr0dm70xv1nzv2jkz8u8ug; resumes from original v0.6 step-25 checkpoint to regenerate the final adapter."
+  - label: "30-step Qwen 0.8B v0.6 second resume retry config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_resume_retry2_from25.toml"
+    notes: "Used for stopped hosted run pnm7mpulnx3j8y1oyjz2sxwx; resumes from the first retry's step-25 checkpoint and records a repeated trainer checkpoint broadcast stall."
+  - label: "30-step Qwen 0.8B v0.6 difficulty ablation config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_3acct_2to3.toml"
+    notes: "Used for completed hosted run uvzzmvybz365g0qqgwbo2san; keeps Qwen 0.8B training params fixed and increases env difficulty to 3 accounts and 2-3 turns."
+  - label: "30-step Qwen 0.8B v0.6 turn-depth ablation config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_3acct_3to4.toml"
+    notes: "Used for stopped run xvpykb8rxhq1kzg5wtnm9ty6 and completed retry xn4ncn6hfi6pexy78mtt5cen; keeps 3 accounts fixed and increases turn depth to 3-4."
+  - label: "30-step Qwen 0.8B v0.6 width ablation config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_3to4.toml"
+    notes: "Used for completed hosted run epzwm0i1cbluvcx27ya4caan; keeps 3-4 turns fixed and increases width to 4 accounts."
+  - label: "30-step Qwen 0.8B v0.6 4-5 turn batch-128 config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_4to5.toml"
+    notes: "Used for stopped hosted runs jvwvglhzbp2h8abmhtkgf6ri and ylzr995pao3587n4xgjnrj1r; both stalled at trainer checkpoint broadcast 1."
+  - label: "30-step Qwen 0.8B v0.6 4-5 turn batch-64 config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_4to5_b64.toml"
+    notes: "Used for completed hosted run zhc48qkatvucpcaqvsekd9sm; 4 accounts and 4-5 turns with batch size 64."
+  - label: "30-step Qwen 0.8B v0.6 5-6 turn batch-64 config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_5to6_b64.toml"
+    notes: "Used for stopped hosted run rzu3o8g5dro2qol7qbfbti1y; 4 accounts and 5-6 turns, superseded by batch-32 retry."
+  - label: "30-step Qwen 0.8B v0.6 5-6 turn batch-32 config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_5to6_b32.toml"
+    notes: "Used for completed hosted run o4qsl2ttfmlnf07bba1uo4qg; 4 accounts and 5-6 turns with batch size 32."
+  - label: "30-step Qwen 0.8B v0.6 6-7 turn batch-32 config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_6to7_b32.toml"
+    notes: "Used for completed hosted run t4kf6tmab09foppeih32pvx6; 4 accounts and 6-7 turns with batch size 32."
+  - label: "30-step Qwen 2B v0.6 6-7 turn batch-32 config"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/configs/qwen2b_30step_v06_diff_4acct_6to7_b32.toml"
+    notes: "Used for completed matched scaling run wc5nvpymcd093n8x9c7yedgt; 4 accounts and 6-7 turns with batch size 32."
+  - label: "eval analysis helper"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-02-meta-memory-state-001/eval_analysis.py"
+    notes: "Summarizes local eval results with reward, token, candidate/truncation, parseability, and exact state/total metrics."
+  - label: "trained adapter"
+    kind: "checkpoint"
+    url_or_path: "lz4roaz2jmokl189l0bj7mqq"
+    notes: "50-step adapter used for trained evals with model string meta-llama/Llama-3.2-1B-Instruct:lz4roaz2jmokl189l0bj7mqq; deployed for eval and unloaded afterward."
+  - label: "Qwen v0.5 trained adapter"
+    kind: "checkpoint"
+    url_or_path: "tipm3xgcydkin391rs5flxm7"
+    notes: "READY adapter record for Qwen run t06x036p2njx21ts5fi5p4vm. Deployment remained stuck in DEPLOYING during the first check, one-shot inference returned 404, delete refused while deployment was in progress, and later status reported DEPLOY_FAILED due timeout."
+  - label: "Qwen v0.6 trained adapter"
+    kind: "checkpoint"
+    url_or_path: "uuntogrnb6um3esp2c5nkk3d"
+    notes: "READY adapter record for Qwen run fdzqzv4ridlnhond78eghitd. Deployment failed with error: Adapter failed to load. Model string would be Qwen/Qwen3.5-0.8B:uuntogrnb6um3esp2c5nkk3d if deployment becomes healthy."
+  - label: "Qwen v0.6 resume retry trained adapter"
+    kind: "checkpoint"
+    url_or_path: "lsbgjt98s0d1nyv5eofomojx"
+    notes: "READY final adapter record for resume retry run jspr0dm70xv1nzv2jkz8u8ug. Initial deployment timed out, but a June 3, 2026 redeploy reached DEPLOYED and one-shot inference returned a normal greeting."
+  - label: "Qwen v0.6 difficulty ablation trained adapter"
+    kind: "checkpoint"
+    url_or_path: "q5bqdxys3dmb0it2zruvhxw0"
+    notes: "READY final adapter record for difficulty ablation run uvzzmvybz365g0qqgwbo2san. Not deployed yet; current ablation read is based on hosted training reward, auxiliary metrics, and sampled rollouts."
+  - label: "Qwen v0.6 turn-depth ablation trained adapter"
+    kind: "checkpoint"
+    url_or_path: "aqpu5vg4x6wmsbfhxi1q9wp1"
+    notes: "READY final adapter record for completed 3-account / 3-4 turn retry run xn4ncn6hfi6pexy78mtt5cen. Not deployed yet; current ablation read is based on hosted training reward, auxiliary metrics, and sampled rollouts."
+  - label: "Qwen v0.6 width ablation trained adapter"
+    kind: "checkpoint"
+    url_or_path: "ebi25offqrl587fnfp55bffx"
+    notes: "READY final adapter record for completed 4-account / 3-4 turn run epzwm0i1cbluvcx27ya4caan. Not deployed yet; current ablation read is based on hosted training reward, auxiliary metrics, and sampled rollouts."
+  - label: "Qwen v0.6 6-7 turn Qwen 0.8B trained adapter"
+    kind: "checkpoint"
+    url_or_path: "dsg66w80rcjhu3kkv0zpdzve"
+    notes: "READY final adapter record for run t4kf6tmab09foppeih32pvx6. Deployed successfully on June 3, 2026 and used for run-scoped held-out eval with model string Qwen/Qwen3.5-0.8B:dsg66w80rcjhu3kkv0zpdzve."
+  - label: "Qwen v0.6 6-7 turn Qwen 2B trained adapter"
+    kind: "checkpoint"
+    url_or_path: "ym5npd2cye3h2zfey3746say"
+    notes: "READY final adapter record for run wc5nvpymcd093n8x9c7yedgt. Deployed successfully on June 3, 2026 and used for run-scoped held-out eval with model string Qwen/Qwen3.5-2B:ym5npd2cye3h2zfey3746say."
+  - label: "Prime env hub page"
+    kind: "external"
+    url_or_path: "https://app.primeintellect.ai/dashboard/environments/abugoot/meta-memory-state"
+    notes: "Latest public Hub env abugoot/meta-memory-state@0.6.0, content hash 790e961c, version ID jigzx1ag2fh2mqaibtjld9zd."
+
+cost_summary:
+  total_cost_usd: 1.3435
+  notes: "Includes four completed 1-step Llama 1B hosted RL smokes, one completed v0.4 Llama 50-step follow-up, one failed no-usage v0.5 Llama launch, one completed v0.5 Qwen 0.8B 50-step run, one completed v0.6 Qwen 0.8B 30-step run, one completed v0.6 step-25-to-30 resume retry, one stopped v0.6 second resume retry, the v0.6 difficulty ladder through 4 accounts / 6-7 turns, the matched Qwen 2B scaling run, and associated stopped retry attempts. New costs after the 4-account / 5-6 turn run were $0.16 for Qwen 0.8B and $0.08 for Qwen 2B. Local eval token usage is recorded separately in evals but no eval cost total was reported by the CLI."
+
+findings:
+  summary: "Implemented, pushed, debugged, trained, and evaluated a cheap deterministic pocket-ledger state env. Version 0.4.0 produced a non-trivial hosted RL reward signal for Llama 1B, then exposed answer stuffing/truncation. Version 0.5.0 fixed that loophole, and v0.6.0 tightened schema penalties. Qwen 0.8B runs now show a clear ladder: easy 2-account/1-2-turn reward reached final 0.916, 3-account/2-3-turn reached 0.951, 3-account/3-4-turn reached 0.879, 4-account/3-4-turn reached 0.865, 4-account/4-5-turn with batch 64 reached 0.895, 4-account/5-6-turn with batch 32 reached 0.848, and 4-account/6-7-turn with batch 32 exposed a small-model bottleneck with final reward 0.713 plus a mid-run length/repetition spike. A matched Qwen 2B run on the 4-account/6-7-turn config avoided that pathology and reached final reward 0.957 for $0.08. Run-scoped held-out evals on the same 6-7-turn setting show base/trained reward of 0.651/0.862 for Qwen 0.8B and 0.728/0.955 for Qwen 2B, with trained 2B exact-turn rate 0.42 and solve_all_examples_rate still 0.0. Across harder settings, exact arithmetic/state fidelity remains the research question."
+  success_criteria_met: true
+  lessons:
+    - "Pure helper tests allow reward robustness checks even without a local Verifiers install."
+    - "The task differs from alphabet-sort by combining arithmetic updates, transfers, signed balances, totals, and hallucinated-entry penalties."
+    - "Prime env integration requires an env README; version 0.1.0 failed CI for missing README.md, and version 0.1.1 passed."
+    - "The prompt template's placeholder key `account` anchored Llama 1B into copying the wrong schema; v0.2.0 replaced it with concrete account keys."
+    - "Hosted Verifiers reward functions receive `answer`, not the local test `state`; v0.3.0 fixed that but still scored zero."
+    - "During hosted scoring, completions contain Verifiers message objects, while logged rollouts serialize to dicts; v0.4.0 accepts both and produced useful reward variance."
+    - "The v0.4.0 integration action appeared stuck during launch, so the smoke used `--skip-action-check`; the action later completed SUCCESS."
+    - "A 50-step cheap run is enough to reveal reward dynamics beyond smoke viability: reward improved, but answer coherence degraded into many candidate ledgers."
+    - "Cheap models can still become more expensive during RL if the learned policy increases decode length; output-token cost was the main driver of the 50-step run."
+    - "Held-out same-reward eval is necessary but not sufficient to establish intended behavior: trained held-out reward rose from base `0.025` to `0.782`, while truncation, code fences, and multi-candidate outputs all rose to `1.0`."
+    - "Auxiliary metrics should be tracked alongside the same reward/objective, rather than replacing the objective with a harder eval-only reward by default."
+    - "The v0.5 base evals confirm that anti-stuffing metrics can run in hosted evals and expose a cleaner but sparser pre-RL signal: about 4% parseable/exact-one-ledger turns and no truncation or multi-candidate outputs."
+    - "The v0.5 Qwen run confirms anti-stuffing can redirect optimization: reward rose while truncation stayed 0.0 and final multi-candidate/code-fence rates were 0.0."
+    - "For this easy 2-account setting, 50 steps is more than needed for learning signal; zero-advantage filtering reached 0.75 by the final step, so 20-30 steps is likely a better first probe."
+    - "Small reward weights matter. An extra `total` key inside `balances` was only lightly penalized in v0.5 and became a concrete v0.6 regression."
+    - "The v0.6 30-step Qwen run confirmed the cheaper probe length is enough for this easy setting: best reward 0.989 at step 25, final reward 0.916, exact-one-ledger 1.0, truncation 0.0, and cost $0.04."
+    - "After schema/format loopholes are mostly controlled, the next useful metric is exact arithmetic/state correctness, because shaped partial reward still scores some wrong ledgers highly."
+    - "v0.6 Llama held-out eval completed normally, so the eval harness still works; Qwen-specific eval/deployment failures are platform/client issues rather than a general env packaging failure."
+    - "Prime's checkpoint_id resume path works for completed runs with READY checkpoints: a step-25-to-30 retry regenerated a fresh final adapter for only $0.0067."
+    - "Retrying deployment of a READY adapter can resolve a prior timeout: lsbgjt98s0d1nyv5eofomojx reached DEPLOYED on a later redeploy and answered a one-shot inference smoke."
+    - "Once deployed, the Qwen resume adapter can run through local eval: a 3-example held-out-seed probe scored reward 0.974 with parseable/exact-one-ledger 1.0 and no truncation, code fences, or multi-candidate outputs."
+    - "A native Prime train restart can preserve the same resume failure mode: pnm7mpulnx3j8y1oyjz2sxwx stalled twice waiting for trainer checkpoint broadcast 26 despite a healthy env-server."
+    - "Increasing env difficulty to 3 accounts / 2-3 turns creates a more informative RL trace: reward improved from 0.573 to 0.951, but the trajectory was noisier, sequence length/cost increased, and final solve_all was only 0.071."
+    - "Format control and arithmetic/state correctness separate cleanly on the harder setting: exact-one-ledger reached 1.0 while samples still made wrong balance/total updates under high shaped reward."
+    - "Increasing turn depth to 3 accounts / 3-4 turns creates a materially harder setting: reward improved from 0.566 to 0.879, but final solve_all stayed 0.0 and sampled step-20 outputs were still arithmetically wrong."
+    - "The 3-4 turn run briefly reintroduced answer-length and multi-candidate pressure around steps 3-9, then recovered clean exact-one-ledger formatting by the final step. This is a useful RL dynamic for the meta dataset."
+    - "Increasing width to 4 accounts at the same 3-4 turn depth did not create a sharp collapse: reward improved from 0.564 to 0.865, formatting recovered by step 10, and final solve_all stayed 0.0."
+    - "For this env, turn depth and exact-state/total correctness appear to be more important difficulty axes than account width alone."
+    - "At 4 accounts / 4-5 turns, batch size matters operationally: two batch-128 attempts stalled at trainer checkpoint broadcast 1, while batch 64 completed for $0.05."
+    - "The completed 4-account / 4-5 turn batch-64 run still reached final reward 0.895 with exact-one-ledger 1.0 and solve_all 0.0, so this is not a shaped-reward degradation point."
+    - "The completed 4-account / 5-6 turn batch-32 run is a clean harder trace: reward improved from 0.568 to 0.848, formatting mostly recovered, final solve_all remained 0.0, and sampled outputs still made large-transfer state and total errors."
+    - "The stopped 4-account / 5-6 turn batch-64 attempt is superseded by the batch-32 run and should not be treated as a task signal."
+    - "The completed 4-account / 6-7 turn Qwen 0.8B batch-32 run is the first clear small-model bottleneck: it hit a mid-run sequence-length/repetition spike at step 9 (seq length 14.7K, repetition filter 0.25, truncation 0.219, multi-candidate rate 0.309) before recovering to clean formatting, and ended at reward 0.713 with solve_all 0.0."
+    - "The matched 4-account / 6-7 turn Qwen 2B run gives a strong model-scaling contrast: it avoided the length/repetition spike, reached final reward 0.957, kept exact-one-ledger/parseable/truncation at 1.0/1.0/0.0 by the end, and cost only $0.08 because token usage stayed low."
+    - "For this env, model capability can reduce total cost despite higher per-token price when it prevents long-output failure modes."
+    - "Run-scoped held-out evals are now stored under their linked RL run IDs with summary.json manifests, making later meta-dataset joins straightforward."
+    - "Held-out evals on the 4-account / 6-7-turn setting confirm RL lift for both model sizes: Qwen 0.8B reward improves 0.651 -> 0.862 and Qwen 2B improves 0.728 -> 0.955."
+    - "Exact-state auxiliary metrics are more discriminating than shaped reward: trained Qwen 2B reaches reward 0.955 but exact-turn rate is 0.42 and solve_all_examples_rate remains 0.0."
+  failure_modes:
+    - "Version 0.1.0 failed Prime env integration because README.md was missing."
+    - "Run rdair5n0ca531bxqqvetrok8 completed with reward mean/min/max all 0.0 and solve_none 1.0."
+    - "Run mngozs87cvyj745q8zaqph9k completed with all-zero rewards after prompt/parser improvements, revealing a hosted reward-interface issue."
+    - "Run qh9lqxz5v3s82sjfs03cso8h completed with all-zero rewards after answer-signature scoring, revealing a message-object compatibility issue."
+    - "No checkpoints were listed by `prime train checkpoints` despite logs saying final checkpoints were written."
+    - "The successful v0.4.0 run logged distributions but `prime train rollouts` returned no samples, despite logs saying 64 samples were logged."
+    - "The 50-step run listed checkpoints at steps 10, 20, 30, and 40; logs said a final step-50 checkpoint was written, but it was not listed by `prime train checkpoints`."
+    - "The 50-step run drove truncation from about 4.3% at step 0 to 96.9% at step 49."
+    - "The v0.5 Llama follow-up failed before training because hosted renderer auto-validation blocked meta-llama/Llama-3.2-1B-Instruct and run_config overrides were admin-only."
+    - "The sprints/Llama-3.2-1B-Instruct mirror failed this env under a free-tier environment requirement check."
+    - "Earlier normal prime eval run attempts for Qwen/Qwen3.5-0.8B hung before creating output directories at 16K, 512, tiny 3-example/256-token, and v0.6 tiny 3-example/16K settings. Later run-scoped Qwen 0.8B and 2B evals on the 6-7 turn setting completed normally."
+    - "Adapter deployment tipm3xgcydkin391rs5flxm7 remained stuck in DEPLOYING initially, one-shot inference returned 404 model not found, delete refused while deployment was in progress, and later status reported DEPLOY_FAILED due timeout."
+    - "Adapter deployment uuntogrnb6um3esp2c5nkk3d for v0.6 failed immediately with error: Adapter failed to load."
+    - "Adapter deployment lsbgjt98s0d1nyv5eofomojx from the v0.6 resume retry initially timed out, then succeeded after a later redeploy retry and passed one-shot inference smoke."
+    - "Run pnm7mpulnx3j8y1oyjz2sxwx, a second resume retry from the first retry's step-25 checkpoint, stalled twice waiting for trainer checkpoint broadcast 26 and was manually stopped after $0.0027."
+    - "Run xvpykb8rxhq1kzg5wtnm9ty6, the first 3-account / 3-4 turn ablation attempt, stalled waiting for trainer checkpoint broadcast 1 and was manually stopped after $0.0052; a fresh retry of the same config completed."
+    - "Runs jvwvglhzbp2h8abmhtkgf6ri and ylzr995pao3587n4xgjnrj1r, both 4-account / 4-5 turn batch-128 attempts, stalled waiting for trainer checkpoint broadcast 1 and were manually stopped after $0.0070 and $0.0069."
+    - "Run rzu3o8g5dro2qol7qbfbti1y, the 4-account / 5-6 turn batch-64 attempt, reached orchestrator step 0 but logged no completed steps before being manually stopped with $0.00 usage; it is superseded by completed batch-32 run o4qsl2ttfmlnf07bba1uo4qg."
+  reward_hacking_observed: true
+  reward_hacking_notes: "The v0.4 50-step run learned to emit many JSON/code-fenced ledger candidates and often used the full token limit. Because v0.4.0 scores the best parseable candidate, high reward can come from answer stuffing rather than producing exactly one coherent `<ledger>` answer. The same behavior appears in held-out eval: reward `0.782`, truncation `1.0`, code-fence turn rate `1.0`, multi-candidate turn rate `1.0`, and mean candidates per turn `13.23`. Version 0.5.0 added explicit penalties and diagnostics; the Qwen v0.5 run avoided this failure but exposed a smaller schema/partial-credit loophole. Version 0.6.0 tightened that schema issue; remaining reward tolerance is mostly arithmetic/state partial credit."
+
+next_steps:
+  - "Use the run-scoped 4-account / 6-7-turn eval grid as the default comparison point for future model-size or reward variants."
+  - "For the next model-size follow-up, try Qwen 4B on the same 4-account / 6-7-turn config, or first add stricter exact-state reward/metrics if we want a cleaner success target than shaped reward."
+  - "Ask Prime or inspect platform logs for Qwen deployment/resume instability: v0.5 timed out, original v0.6 failed to load, lsbgjt98s0d1nyv5eofomojx deployed only on retry, and pnm7mpulnx3j8y1oyjz2sxwx stalled twice at trainer checkpoint broadcast 26."
+  - "Consider a v0.7 reward/metrics variant that records exact-correct state tracking and optionally tightens arithmetic/total penalties."
+  - "Use 20-30 steps as the default cheap Qwen 0.8B first probe for this easy setting; longer runs are mainly saturation/drift checks."
+
+status: "completed"

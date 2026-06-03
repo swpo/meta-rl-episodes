@@ -1,7 +1,7 @@
 # Phase 0 Cost Calibration
 
 Goal: measure the practical cost and wall-clock behavior of tiny hosted RL runs
-before asking subagents to launch independent research tracks.
+before launching broader research tracks.
 
 This phase is intentionally about infrastructure economics, not environment
 science. We hold the environment and run shape fixed, then vary only the model.
@@ -235,9 +235,9 @@ Read:
 `Qwen/Qwen3.5-0.8B` is not a drop-in cost-probe default for this env/config.
 This may be a model/client serialization issue, an environment parser/reward
 robustness issue for `None` assistant content, or an interaction between Qwen
-TITO rollouts and the alphabet-sort environment. For subagent defaults, prefer
-the Llama 1B baseline unless a Qwen-family comparison is specifically needed and
-has passed a smoke run.
+TITO rollouts and the alphabet-sort environment. As a default, prefer the Llama
+1B baseline unless a Qwen-family comparison is specifically needed and has
+passed a smoke run.
 
 ## Qwen 2B Result
 
@@ -469,6 +469,27 @@ This is the first small-Qwen run that produced a real reward distribution on
 hosted RL. It did not need the full 16K budget; the important difference appears
 to be the rollout client path, not output length.
 
+Follow-up confirmation on `meta-memory-state`:
+
+- Run `t06x036p2njx21ts5fi5p4vm` used `Qwen/Qwen3.5-0.8B`, 50 steps,
+  `batch_size=128`, `rollouts_per_example=8`, and `max_tokens=16384` on
+  `abugoot/meta-memory-state@0.5.0`.
+- It completed for `1.16M` training tokens and `$0.07`.
+- Reward rose from `0.451` at step 0 to best `0.993` at step 47 and final
+  `0.936` at step 49.
+- Actual output stayed short despite the 16K cap: final decode mean was about
+  `43.5` tokens, with truncation `0.0`.
+- Run `fdzqzv4ridlnhond78eghitd` repeated the check on
+  `abugoot/meta-memory-state@0.6.0` for 30 steps and completed for `728.46K`
+  training tokens and `$0.04`.
+- The v0.6 reward rose from `0.543` at step 0 to best `0.989` at step 25 and
+  final `0.916` at step 29, again with truncation `0.0` and short outputs.
+
+Read: Qwen 0.8B is a good default for cheap 20-50 step probes when the hosted
+run takes the direct renderer path and the env reward handles malformed/None
+content defensively. Use the large token cap as a compatibility guard, not as
+an expectation that the model should spend that budget.
+
 ### Qwen 2B at 16K
 
 Run: `b3kwqzaz7ssfnyk0j7dwgm3w`
@@ -687,5 +708,5 @@ supports a provider-compatible no-thinking setting.
 - Are checkpoint/adaptor artifacts produced on a cadence that is useful for
   very short runs?
 - Is a 50-step run enough to estimate cost linearly for 5/20/100-step variants?
-- Should the subagent default be Llama 1B for cheap probes, with Qwen 9B or 35B
-  reserved for capability probes after a one-step 16K smoke test?
+- Should the default cheap probe be Llama 1B, with Qwen 9B or 35B reserved for
+  capability probes after a one-step 16K smoke test?

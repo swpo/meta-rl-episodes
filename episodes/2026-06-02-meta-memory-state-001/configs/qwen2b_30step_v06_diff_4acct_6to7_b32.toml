@@ -1,0 +1,25 @@
+# Scaling probe for meta-memory-state v0.6.0.
+#
+# Match the 4-account / 6-7 turn Qwen 0.8B difficulty run, but scale to the
+# next available Qwen size.
+# Expected command:
+# prime train episodes/2026-06-02-meta-memory-state-001/configs/qwen2b_30step_v06_diff_4acct_6to7_b32.toml --yes --plain
+
+model = "Qwen/Qwen3.5-2B"
+max_steps = 30
+batch_size = 32
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 16384
+
+[[env]]
+id = "abugoot/meta-memory-state@0.6.0"
+name = "meta_memory_state_qwen2b_30step_v06_diff_4acct_6to7_b32"
+
+[env.args]
+seed = 1337420
+num_examples = 128
+min_turns = 6
+max_turns = 7
+account_count = 4

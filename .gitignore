@@ -1,5 +1,7 @@
 # Local/generated evaluation outputs.
 outputs/
+episodes/**/env/dist/
+episodes/**/env/.prime/
 
 # Python/editor noise.
 __pycache__/

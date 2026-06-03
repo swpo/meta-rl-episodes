@@ -1,6 +1,6 @@
 # Meta Environment Registry
 
-Use this registry to avoid accidental duplicate work across subagents.
+Use this registry to avoid accidental duplicate work across episodes.
 
 Every environment intended for Prime Hub should use a `meta-` prefix in its env
 ID/name, for example:
@@ -23,15 +23,21 @@ Before starting an episode:
 
 1. Pick a track from `agents/tracks/` or propose a new one.
 2. Add a row with status `claimed`.
-3. Include owner/thread, intended env name, task family, and expected expensive
+3. Include owner/episode, intended env name, task family, and expected expensive
    dependencies.
 4. Check for similar rows and intentionally differentiate the env.
 
 After completing an episode:
 
-1. Update status to `completed`, `blocked`, or `abandoned`.
+1. Update status to `local-ready`, `hub-ready`, `completed`, `blocked`, or `abandoned`.
 2. Add Prime env/version, run IDs, costs, and the key result.
 3. Link the episode directory and report/notebook.
+
+Use `local-ready` when an env scaffold and deterministic local checks pass but
+Prime Hub/install/eval/training integration has not yet been verified.
+
+Use `hub-ready` when the env has been pushed to Prime Hub and has a prepared
+hosted run config, but the first hosted eval/RL run has not completed yet.
 
 ## Cost Labels
 
@@ -48,13 +54,13 @@ Use these labels in the registry:
 
 ## Registry
 
-| Env Name | Status | Owner/Thread | Track | Task Family | Reward Type | Tools / Expensive Dependencies | Similar Envs To Avoid | Prime Env / Version | Episode | Run IDs | Cost | Key Result |
+| Env Name | Status | Owner/Episode | Track | Task Family | Reward Type | Tools / Expensive Dependencies | Similar Envs To Avoid | Prime Env / Version | Episode | Run IDs | Cost | Key Result |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- |
 | `meta-tool-coherence` | unclaimed | - | tool-coherence | tool use / answer synthesis | deterministic + format | tool-cheap | - | - | - | - | - | Tool calls should help on some cases and hurt coherence on others. |
-| `meta-memory-state` | unclaimed | - | multi-turn-state | multi-turn memory | deterministic / shaped | cheap | alphabet-sort | - | - | - | - | Tests state tracking across turns without needing a sandbox. |
+| `meta-memory-state` | completed | episode `2026-06-02-meta-memory-state-001` | multi-turn-state | multi-turn ledger memory | deterministic / shaped + anti-stuffing | cheap | alphabet-sort | `abugoot/meta-memory-state@0.6.0`, hash `790e961c...` | [episodes/2026-06-02-meta-memory-state-001](episodes/2026-06-02-meta-memory-state-001) | `rdair5n0ca531bxqqvetrok8`, `mngozs87cvyj745q8zaqph9k`, `qh9lqxz5v3s82sjfs03cso8h`, `msisq47uw7tcnvuxn5aejrbg`, `wpw270lopu0vrzyfx9otn6w1`, `ovhe41qu43r1i3gwo98lw0mq`, `t06x036p2njx21ts5fi5p4vm`, `fdzqzv4ridlnhond78eghitd`, `jspr0dm70xv1nzv2jkz8u8ug`, `pnm7mpulnx3j8y1oyjz2sxwx`, `uvzzmvybz365g0qqgwbo2san`, `xvpykb8rxhq1kzg5wtnm9ty6`, `xn4ncn6hfi6pexy78mtt5cen`, `epzwm0i1cbluvcx27ya4caan`, `jvwvglhzbp2h8abmhtkgf6ri`, `ylzr995pao3587n4xgjnrj1r`, `zhc48qkatvucpcaqvsekd9sm`, `rzu3o8g5dro2qol7qbfbti1y`, `o4qsl2ttfmlnf07bba1uo4qg`, `t4kf6tmab09foppeih32pvx6`, `wc5nvpymcd093n8x9c7yedgt` | `$1.3435` | v0.4 Llama 1B improved reward but exploited best-candidate scoring via candidate stuffing/truncation. v0.5/v0.6 Qwen runs fixed formatting/stuffing and established cheap probes. Difficulty ladder: 3-account / 2-3-turn reward `0.573 -> 0.951`; 3-account / 3-4-turn retry `0.566 -> 0.879`; 4-account / 3-4-turn `0.564 -> 0.865`; 4-account / 4-5-turn batch-64 `0.566 -> 0.895`; 4-account / 5-6-turn batch-32 `0.568 -> 0.848`; 4-account / 6-7-turn batch-32 Qwen 0.8B `0.569 -> 0.713` with mid-run length/repetition spike; matched Qwen 2B `0.713 -> 0.957` without that pathology. Run-scoped held-out evals on 4-account / 6-7 turns show base/trained reward `0.651 -> 0.862` for Qwen 0.8B and `0.728 -> 0.955` for Qwen 2B; trained 2B exact-turn rate `0.42`, solve-all examples `0.0`. |
 | `meta-sparse-shaping` | unclaimed | - | sparse-vs-shaped | curriculum / reward design | sparse and shaped variants | cheap | - | - | - | - | - | Paired env/config to compare sparse vs shaped reward dynamics. |
 | `meta-reward-hack-format` | unclaimed | - | reward-hacking-format | adversarial formatting | deterministic with hack traps | cheap | backdoor/ifeval-style tasks | - | - | - | - | Tests parser/reward loopholes without an LLM judge. |
-| `meta-data-analysis-lite` | unclaimed | - | data-analysis-sandbox | tabular data analysis | deterministic computed answers | sandbox | - | - | - | - | - | Sandbox needed; keep dataset small and record runtime/cost. |
+| `meta-data-analysis-lite` | local-ready | episode `2026-06-03-meta-data-analysis-lite-001` | data-analysis-sandbox | tabular data analysis | deterministic computed answers | cheap now; sandbox later | `meta-memory-state` | local v0.1.0 candidate | [episodes/2026-06-03-meta-data-analysis-lite-001](episodes/2026-06-03-meta-data-analysis-lite-001) | - | `$0.00` | Initial no-tool version is locally validated before adding sandbox/tool variants. Generated CSV questions cover sums, counts, argmax, differences, and averages with exact shaped reward and anti-stuffing metrics. Local tests: 15 passed. |
 | `meta-code-debug-mini` | unclaimed | - | code-debugging | coding/debugging | unit tests / deterministic | sandbox | - | - | - | - | - | Small code repair tasks with cheap tests; sandbox cost must be tracked. |
 | `meta-model-threshold` | unclaimed | - | model-threshold | capability threshold | deterministic | cheap | - | - | - | - | - | Designed so Llama 1B struggles and Qwen 9B/35B may be needed. |
 | `meta-science-mini` | unclaimed | - | science-reasoning | scientific reasoning | deterministic / rubric-lite | cheap or judge optional | bioreasoning_phenotype | - | - | - | - | Tiny science task without external judge by default. |

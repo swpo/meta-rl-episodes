@@ -18,6 +18,17 @@ Weak default recommendation:
 - Start hosted RL probes with `meta-llama/Llama-3.2-1B-Instruct`.
 - Use small runs first: 1-step smoke, then 5-20 steps, then only scale if the
   run produces useful reward variance and clean artifacts.
+- For nontrivial episodes, keep a fixed eval matrix: base model on the training
+  seed, base model on a held-out seed, then trained checkpoint/adapter on the
+  same seeds when the RL run is not obviously broken.
+- Use the same reward/objective for eval; track auxiliary metrics separately to
+  explain reward movement and expose overfit, truncation, reward hacking, or
+  tool/coherence failures.
+- A 20-50 step Llama 1B follow-up can still be cheap enough to be worthwhile
+  when the smoke is healthy; the first completed episode cost `$0.61` for 50
+  steps, and revealed reward hacking via verbose answer stuffing.
+- Watch output length and truncation as cost and quality signals, not just
+  reward mean.
 - Try larger Qwen models only when the environment appears to need more
   capability.
 - For Qwen, use a one-step smoke with a high token ceiling, usually
@@ -32,18 +43,15 @@ for the evidence behind this recommendation.
 ## Scaffold
 
 - [agents/rl_episode_agent_brief.md](agents/rl_episode_agent_brief.md): prompt
-  brief for a Codex/subagent running one research episode.
+  brief for Codex or another researcher running one episode.
 - [agents/rl_episode_runbook.md](agents/rl_episode_runbook.md): operational
   workflow for designing an env, running smokes, launching hosted RL, and
   collecting artifacts.
-- [agents/subagent_spawn_prompt.md](agents/subagent_spawn_prompt.md): copy-paste
-  prompt for launching a new episode thread.
+- [agents/verifiers_env_patterns.md](agents/verifiers_env_patterns.md): portable
+  Verifiers implementation patterns distilled for this repo.
 - [env_registry.md](env_registry.md): coordination registry for claimed and
   completed environments.
-- [agents/tracks/](agents/tracks): initial track briefs to reduce duplicate
-  work across subagents.
-- [agents/track_assignment_template.md](agents/track_assignment_template.md):
-  fill-in assignment note for a specific subagent track.
+- [agents/tracks/](agents/tracks): initial research directions and env ideas.
 - [schemas/episode_record.schema.json](schemas/episode_record.schema.json):
   structured schema for episode records.
 - [templates/episode_record.yaml](templates/episode_record.yaml): fill-in
@@ -66,6 +74,7 @@ Each research episode should leave enough context that another agent can answer:
 - What was the reward signal, and where might it be brittle or hackable?
 - Which smoke tests passed or failed?
 - Which hosted runs were launched, with exact configs and run IDs?
+- What were the base and held-out eval results before and after RL?
 - What did Prime report for status, usage, metrics, progress, checkpoints, and
   rollouts?
 - What changed after observing the run?
@@ -81,9 +90,10 @@ Before starting a new environment, claim a row in
 Prime Hub entries are easy to identify as part of this project.
 
 Track briefs in [agents/tracks/](agents/tracks) are meant to spread agents
-across different RL dynamics: tool coherence, multi-turn state, sparse vs
-shaped reward, reward-hacking formats, data analysis, code debugging, model
-thresholds, and science mini-reasoning.
+across different RL dynamics when we are ready for more throughput. For now,
+they are an idea backlog: tool coherence, multi-turn state, sparse vs shaped
+reward, reward-hacking formats, data analysis, code debugging, model thresholds,
+and science mini-reasoning.
 
 Tools are acceptable and often cheap. Sandboxes and judge models are also
 allowed when central to the track, but label them as explicit cost drivers in

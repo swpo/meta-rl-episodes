@@ -1,0 +1,8 @@
+2026-06-02 20:13:03 - verifiers.utils.env_utils - INFO - Loading environment: meta-memory-state
+2026-06-02 20:13:03 - verifiers.utils.env_utils - INFO - Using provided args: max_turns=2, min_turns=1, account_count=2, seed=424242, num_examples=128
+2026-06-02 20:13:03 - verifiers.utils.env_utils - INFO - Successfully loaded environment 'meta-memory-state'
+2026-06-02 20:13:03 - verifiers.utils.thread_utils - INFO - Scaled default executor and 0 registered executor(s) ()
+2026-06-02 20:13:03 - verifiers.serve.server.env_worker.EnvWorker - INFO - Initialized worker meta-memory-state-0 on ipc:///tmp/vf-7935e96ed8c8-meta-memory-state-0
+2026-06-02 20:13:03 - verifiers.serve.server.env_worker.EnvWorker - INFO - Starting worker meta-memory-state-0
+2026-06-02 20:13:18 - verifiers.utils.process_utils - INFO - Death pipe closed — parent is gone, sending SIGTERM to self
+2026-06-02 20:13:18 - verifiers.serve.server.env_worker.EnvWorker - INFO - Shut down worker meta-memory-state-0

@@ -1,0 +1,12 @@
+2026-06-02 16:35:43 - verifiers.serve.server.env_server.ZMQEnvServer - INFO - Initializing ZMQEnvServer to serve meta-memory-state (env_args={'seed': 424242, 'num_examples': 128, 'min_turns': 1, 'max_turns': 2, 'account_count': 2}, extra_env_kwargs={'concurrency': 4}, num_workers=1)
+2026-06-02 16:35:43 - verifiers.serve.server.env_server.ZMQEnvServer - INFO - ZMQEnvServer started on tcp://127.0.0.1:64410
+2026-06-02 16:35:43 - verifiers.serve.server.env_router.EnvRouter - INFO - Started worker (id=0, name=meta-memory-state-0, address=ipc:///tmp/vf-c5de4e153a65-meta-memory-state-0, pid=49735)
+2026-06-02 16:35:53 - verifiers.serve.server.env_router.EnvRouter - INFO - Active tasks: 0 (W0: ?)
+  Server | Lag: min=0ms mean=1ms median=1ms p90=1ms p99=1ms max=2ms (n=99)
+  W0     | no stats yet
+2026-06-02 16:36:03 - verifiers.serve.server.env_router.EnvRouter - INFO - Active tasks: 4 (W0: 4)
+  Server | Lag: min=0ms mean=1ms median=1ms p90=1ms p99=1ms max=2ms (n=198)
+  W0     | Lag: min=0ms mean=2ms median=1ms p90=1ms p99=11ms max=58ms (n=98)
+2026-06-02 16:36:03 - verifiers.utils.process_utils - INFO - Death pipe closed — parent is gone, sending SIGTERM to self
+2026-06-02 16:36:04 - verifiers.serve.server.env_router.EnvRouter - INFO - Router shut down
+2026-06-02 16:36:04 - verifiers.serve.server.env_server.ZMQEnvServer - INFO - ZMQEnvServer shut down

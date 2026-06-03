@@ -4,7 +4,7 @@ title: "<short descriptive title>"
 created_at: "<ISO-8601 timestamp>"
 updated_at: "<ISO-8601 timestamp>"
 agent:
-  name: "<agent or thread name>"
+  name: "<researcher or agent name>"
   model: "<agent model if known>"
   notes: ""
 
@@ -48,6 +48,33 @@ eval_smokes: []
 #   avg_output_tokens: null
 #   truncation_rate: null
 #   error_rate: null
+#   notes: ""
+
+evals: []
+# - eval_id: ""
+#   eval_type: "base-train" # base-train | base-heldout | trained-train | trained-heldout | other
+#   command: ""
+#   model: ""
+#   env_id: ""
+#   env_version: ""
+#   env_args: {}
+#   seed: null
+#   split: ""
+#   max_tokens: 0
+#   temperature: null
+#   num_examples: 0
+#   rollouts_per_example: 0
+#   status: ""
+#   output_path: ""
+#   avg_reward: null
+#   reward_std: null
+#   reward_min: null
+#   reward_max: null
+#   truncation_rate: null
+#   error_rate: null
+#   avg_input_tokens: null
+#   avg_output_tokens: null
+#   auxiliary_metrics: {}
 #   notes: ""
 
 hosted_runs: []

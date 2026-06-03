@@ -1,0 +1,44 @@
+{
+  "linked_rl_run_id": "t4kf6tmab09foppeih32pvx6",
+  "eval_type": "trained_heldout",
+  "eval_job_id": "meta_memory_state_Qwen_Qwen3.5_0.8B:dsg66w80rcjhu3kkv0zpdzve_20260603_150840_facd8252",
+  "model": "Qwen/Qwen3.5-0.8B:dsg66w80rcjhu3kkv0zpdzve",
+  "adapter_id": "dsg66w80rcjhu3kkv0zpdzve",
+  "env": "abugoot/meta-memory-state@0.6.0",
+  "env_args": {
+    "seed": 424242,
+    "num_examples": 32,
+    "min_turns": 6,
+    "max_turns": 7,
+    "account_count": 4
+  },
+  "eval_params": {
+    "n": 8,
+    "rollouts_per_example": 1,
+    "concurrency": 1,
+    "max_tokens": 16384,
+    "temperature": 0.7,
+    "skip_upload": true
+  },
+  "result_path": "episodes/2026-06-02-meta-memory-state-001/evals/run_t4kf6tmab09foppeih32pvx6/trained_heldout_seed424242_4acct_6to7_n8/evals/meta-memory-state--Qwen--Qwen3.5-0.8B:dsg66w80rcjhu3kkv0zpdzve/e000b512/results.jsonl",
+  "metrics": {
+    "reward_mean": 0.8618528415061391,
+    "reward_std": 0.05719001300941907,
+    "reward_min": 0.7725235478806908,
+    "reward_max": 0.929034090909091,
+    "num_examples": 8,
+    "assistant_turns": 50,
+    "avg_input_tokens": 2112.125,
+    "avg_output_tokens": 282.625,
+    "parseable_turn_rate": 1.0,
+    "exact_one_ledger_turn_rate": 1.0,
+    "multi_candidate_turn_rate": 0.0,
+    "code_fence_turn_rate": 0.0,
+    "truncation_rate": 0.0,
+    "exact_turn_rate": 0.06,
+    "all_balances_exact_turn_rate": 0.32,
+    "total_exact_turn_rate": 0.12,
+    "account_exact_rate": 0.765,
+    "solve_all_examples_rate": 0.0
+  }
+}

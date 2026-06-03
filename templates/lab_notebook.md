@@ -37,6 +37,14 @@ Result:
 - Errors:
 - Notes:
 
+## Eval Matrix
+
+Use the same reward/objective for base and trained evals. Record auxiliary
+metrics separately when they explain what the reward is doing.
+
+| Eval | Model | Seed/Split | Examples | Reward | Truncation | Aux Metrics | Notes |
+| --- | --- | --- | ---: | --- | ---: | --- | --- |
+
 ### Hosted RL Smoke
 
 Run ID:

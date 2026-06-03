@@ -1,6 +1,6 @@
 # Episodes
 
-Each subagent or research thread should create one directory here:
+Each research episode should create one directory here:
 
 ```text
 episodes/<date>-<short-name>/

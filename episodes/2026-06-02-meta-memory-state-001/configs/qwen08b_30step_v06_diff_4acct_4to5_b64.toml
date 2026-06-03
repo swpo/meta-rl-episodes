@@ -1,0 +1,26 @@
+# Difficulty ablation for meta-memory-state v0.6.0.
+#
+# Same 4-account / 4-5 turn difficulty as qwen08b_30step_v06_diff_4acct_4to5,
+# but with a smaller hosted training batch after two batch-128 attempts stalled
+# at trainer checkpoint broadcast 1.
+# Expected command:
+# prime train episodes/2026-06-02-meta-memory-state-001/configs/qwen08b_30step_v06_diff_4acct_4to5_b64.toml --yes --plain
+
+model = "Qwen/Qwen3.5-0.8B"
+max_steps = 30
+batch_size = 64
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 16384
+
+[[env]]
+id = "abugoot/meta-memory-state@0.6.0"
+name = "meta_memory_state_qwen08b_30step_v06_diff_4acct_4to5_b64"
+
+[env.args]
+seed = 1337420
+num_examples = 128
+min_turns = 4
+max_turns = 5
+account_count = 4

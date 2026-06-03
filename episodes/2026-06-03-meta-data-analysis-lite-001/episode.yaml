@@ -1,0 +1,99 @@
+schema_version: 0.1.0
+episode_id: "2026-06-03-meta-data-analysis-lite-001"
+title: "Small-table arithmetic RL environment"
+created_at: "2026-06-03T16:31:30-05:00"
+updated_at: "2026-06-03T16:35:13-05:00"
+agent:
+  name: "Codex"
+  model: "GPT-5"
+  notes: "Second clean-slate meta RL episode; scaffolded locally after completing meta-memory-state."
+
+research_question: "Can a small model learn reliable tabular arithmetic over generated CSVs using a cheap deterministic reward, and where does difficulty appear as row count and task mix scale?"
+hypotheses:
+  - "Llama 1B may learn result-tag/schema behavior quickly but struggle with aggregation as rows/task mix scale."
+  - "Reward should separate format compliance, exact answer rate, and numeric closeness."
+  - "Row count and task-family mix should give an interpretable difficulty ladder before model scaling."
+
+environment:
+  kind: "local"
+  id: "meta-data-analysis-lite"
+  version: "0.1.0"
+  dashboard_url: ""
+  local_path: "episodes/2026-06-03-meta-data-analysis-lite-001/env"
+  entrypoint: "meta_data_analysis_lite.load_environment"
+  env_args:
+    seed: 20260603
+    num_examples: 128
+    min_rows: 8
+    max_rows: 12
+    task_families: "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+  dataset:
+    name: "synthetic generated CSV tables"
+    split: "generated"
+    source_url: ""
+  prompt_summary: "Single user turn containing a generated CSV and one arithmetic/aggregation question."
+  reward_summary: "Shaped deterministic score for exactly one JSON result object inside <result> tags, with answer correctness, schema/format credit, and anti-stuffing penalties."
+  parser_assumptions:
+    - "Score the selected final result candidate rather than the best hidden candidate."
+    - "Accept valid JSON outside tags with a format penalty."
+    - "Coerce numeric strings for scoring, but reward schema prefers a JSON number."
+  tools: []
+  known_risks:
+    - "Easy rungs may mostly train formatting if arithmetic is too simple."
+    - "Numeric closeness can improve while exact answer rate remains low."
+    - "Multiple-candidate outputs must remain penalized to avoid answer stuffing."
+
+model_plan:
+  default_probe_model: "meta-llama/Llama-3.2-1B-Instruct"
+  capability_probe_models:
+    - "Qwen/Qwen3.5-0.8B"
+    - "Qwen/Qwen3.5-2B"
+  token_budget_notes: "No-tool v0.1 should fit within 512 output tokens; tool/sandbox variants may need larger ceilings."
+  expected_cost_notes: "Expected cheap because there is no sandbox, judge model, or long multi-turn trajectory."
+
+eval_smokes:
+  - eval_id: "local-unit-tests-v01"
+    command: "PYTHONDONTWRITEBYTECODE=1 python -m pytest episodes/2026-06-03-meta-data-analysis-lite-001/env/test_meta_data_analysis_lite.py"
+    model: "n/a"
+    max_tokens: 0
+    num_examples: 0
+    rollouts_per_example: 0
+    status: "passed"
+    avg_reward: null
+    avg_input_tokens: null
+    avg_output_tokens: null
+    truncation_rate: null
+    error_rate: 0.0
+    notes: "15 local tests passed; covers deterministic generation, task families, parser/reward behavior, candidate stuffing penalties, and diagnostics."
+evals: []
+hosted_runs: []
+artifact_links:
+  - label: "local env source"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-03-meta-data-analysis-lite-001/env/meta_data_analysis_lite.py"
+    notes: "Initial deterministic table QA environment."
+  - label: "local tests"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-03-meta-data-analysis-lite-001/env/test_meta_data_analysis_lite.py"
+    notes: "Generation, parsing, reward, and diagnostic tests."
+
+cost_summary:
+  total_cost_usd: 0.0
+  notes: "No hosted eval or RL run launched yet."
+
+findings:
+  summary: "Initial local v0.1.0 scaffold passes deterministic generation, parser, reward, and diagnostic tests; no RL dynamics observed yet."
+  success_criteria_met: false
+  lessons:
+    - "Starting no-tool keeps the table-QA environment cheap and separates arithmetic reward dynamics from sandbox/tool effects."
+    - "Auxiliary metrics should distinguish exact answer learning from format/schema learning and numeric near-miss improvement."
+  failure_modes: []
+  reward_hacking_observed: false
+  reward_hacking_notes: ""
+
+next_steps:
+  - "Push the environment to Prime Hub after local checks pass."
+  - "Run base evals on easy and mixed rungs before hosted RL."
+  - "Launch the 1-step Llama 1B hosted smoke only after Prime evals show clean parser behavior."
+
+status: "draft"

@@ -10,6 +10,11 @@
 | Eval ID | Dashboard | Command/Config | Status | Notes |
 | --- | --- | --- | --- | --- |
 
+## Local Evals
+
+| Eval | Output Path | Model | Env Args | Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+
 ## Checkpoints
 
 | Run ID | Step | Checkpoint ID | Status | Notes |

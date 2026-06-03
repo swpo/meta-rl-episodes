@@ -37,6 +37,12 @@ New envs intended for Prime Hub should use a `meta-` prefix:
 meta-<short-env-name>
 ```
 
+Use repo-local reference notes, especially `agents/verifiers_env_patterns.md`,
+before depending on external context that is not recorded in this repo. If an
+episode needs an external reference, record what was used and preserve the
+relevant pattern here so future researchers can reproduce the setup from a
+clean checkout.
+
 ## 2. Define The Research Question
 
 Good questions are narrow:
@@ -81,9 +87,13 @@ Tools are often cheap enough to use when they are central to the experiment.
 Sandboxes and judge models are allowed, but they are cost/runtime dependencies
 and should be labeled in the registry and episode record.
 
-## 4. Smoke Test Before Hosted RL
+## 4. Base Eval Before Hosted RL
 
-Run a tiny eval first when possible:
+Run a tiny eval first when possible. For a real episode, make this a fixed
+base-model eval on the intended training seed and, when cheap enough, a matched
+held-out seed. Use the same reward/objective as training; put extra judgments in
+auxiliary metrics rather than inventing an eval-only reward unless the research
+question explicitly needs a second objective.
 
 ```bash
 prime eval run <env_id_or_config> \
@@ -102,11 +112,25 @@ Look for:
 - Truncation.
 - Reward range.
 - Format compliance.
+- Auxiliary metrics relevant to the env, such as candidate count, parseability,
+  exact-format rate, output length, account accuracy, total accuracy, or tool
+  success.
 - Tool-call behavior if relevant.
 
-## 5. Hosted RL Smoke
+Record eval seeds, env args, model, max tokens, temperature, reward mean/std,
+truncation, input/output tokens, local output paths, and a short qualitative
+read. The held-out seed should stay fixed across env iterations so later runs
+are comparable.
 
-First hosted run should usually be 1 step:
+## 5. Hosted RL Smoke And Follow-Up
+
+After local checks pass, push the environment to Prime Hub and wait for the
+Prime integration action to succeed. If the action fails, inspect the action
+logs, fix the env, push a new version, and record both the failed and fixed
+versions in the episode.
+
+The first hosted smoke should be exactly one Llama 1B, 1-step run with no
+sandbox or judge model unless the episode explicitly requires one:
 
 ```toml
 model = "meta-llama/Llama-3.2-1B-Instruct"
@@ -125,6 +149,11 @@ name = "<episode_env_name>"
 # env-specific args
 ```
 
+Do not skip the Prime Hub integration check before launching the default smoke.
+Before launching a larger model, Qwen smoke, 5-20 step follow-up,
+sandbox-heavy run, or judge-model run, write down why the first smoke justifies
+it and what cost envelope you expect.
+
 Launch:
 
 ```bash
@@ -139,6 +168,25 @@ prime train usage <run_id> --plain
 prime train progress <run_id> --plain
 prime train metrics <run_id> --plain
 prime train logs <run_id> --plain
+```
+
+After every nontrivial hosted RL run:
+
+1. Inspect metrics, logs, rollout samples, and cost.
+2. If the run is obviously broken, debug the env/config before more evals.
+3. If the run is not obviously broken, evaluate the trained checkpoint or
+   deployed adapter on the same fixed train-seed and held-out-seed evals used
+   for the base model.
+4. Compare base eval, RL training metrics, trained train-seed eval, and trained
+   held-out eval using the same reward and auxiliary metrics.
+5. Iterate the env or config based on the mechanism you see, not only the reward
+   mean.
+
+If checkpoint eval requires an adapter deployment, record the deployment model
+ID and the exact eval model string, for example:
+
+```text
+meta-llama/Llama-3.2-1B-Instruct:<adapter_id>
 ```
 
 ## 6. Model And Token Defaults
@@ -215,7 +263,23 @@ Suggested scale-up ladder:
 1 step -> 5 steps -> 20 steps -> 50+ steps
 ```
 
+Each later rung requires a short rationale based on reward variance,
+truncation, zero-advantage filtering, rollout quality, and observed cost.
+
+The ladder is a guide, not a quota. A 50-step Llama 1B run can still be cheap
+enough to justify when the smoke is healthy, but the `meta-memory-state` episode
+showed why longer probes need qualitative rollout inspection: reward rose while
+the policy learned verbose candidate stuffing and drove truncation near 97%.
+
 At each stage, update `episode.yaml` and `notebook.md`.
+
+Use `status: "draft"` for episodes that still need a hosted eval/RL smoke. Use
+the registry status `local-ready` for envs whose deterministic helpers pass but
+whose Hub path is not yet verified, and `hub-ready` for envs that have been
+pushed to Prime Hub but have not yet completed their first hosted run. Reserve
+`status: "complete"` for episodes whose intended hosted or eval path has been
+checked, or for deliberately no-hosting episodes where the scope is explicitly
+local.
 
 ## 8. Record The Episode
 

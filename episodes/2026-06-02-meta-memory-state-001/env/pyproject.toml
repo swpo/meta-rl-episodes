@@ -1,0 +1,18 @@
+[project]
+name = "meta-memory-state"
+version = "0.6.0"
+tags = ["ledger", "memory", "multi-turn", "state-tracking", "synthetic"]
+license = "Apache-2.0"
+description = "A deterministic multi-turn pocket-ledger state tracking environment."
+readme = "README.md"
+dependencies = [
+    "verifiers>=0.1.9",
+    "datasets>=2.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["meta_memory_state.py", "README.md"]
