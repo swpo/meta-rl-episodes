@@ -4,13 +4,17 @@ import unittest
 
 from meta_data_analysis_lite import (
     TASK_FAMILIES,
+    analyze_table,
     answer_diagnostics,
     completion_diagnostics,
+    load_environment,
     make_examples,
     response_diagnostics,
     score_completion,
     score_result_response,
     selected_result_candidate,
+    table_csv,
+    tool_response_diagnostics,
 )
 
 
@@ -42,6 +46,44 @@ class MetaDataAnalysisLiteTests(unittest.TestCase):
         examples = make_examples(seed=11, num_examples=32, min_rows=8, max_rows=12)
         dataset = Dataset.from_list(examples)
         self.assertEqual(len(dataset), 32)
+
+    def test_analyze_table_answers_generated_questions(self):
+        for family in TASK_FAMILIES:
+            example = make_examples(
+                seed=21,
+                num_examples=1,
+                min_rows=8,
+                max_rows=8,
+                task_families=[family],
+            )[0]
+            expected = json.loads(example["answer"])
+            result = analyze_table(
+                table_csv(example["info"]["rows"]),
+                example["info"]["question"],
+            )
+            self.assertNotIn("error", result)
+            self.assertEqual(result["answer"], expected["answer"])
+            self.assertEqual(result["task_family"], family)
+
+    def test_analyze_table_reports_invalid_question(self):
+        example = make_examples(seed=22, num_examples=1)[0]
+        result = analyze_table(table_csv(example["info"]["rows"]), "Who won?")
+        self.assertIn("error", result)
+
+    def test_tool_enabled_prompt_mentions_tool(self):
+        example = make_examples(seed=23, num_examples=1, tools_enabled=True)[0]
+        self.assertIn("analyze_table tool", example["prompt"][0]["content"])
+        self.assertIn("at most once", example["prompt"][0]["content"])
+        self.assertEqual(example["info"]["tools_enabled"], True)
+
+    def test_load_environment_can_return_tool_env(self):
+        try:
+            import datasets  # noqa: F401
+            import verifiers  # noqa: F401
+        except Exception as exc:
+            self.skipTest(f"tool env dependencies unavailable: {exc}")
+        env = load_environment(num_examples=4, tools=True, max_tool_turns=2)
+        self.assertIn("ToolEnv", type(env).__name__)
 
     def test_exact_numeric_json_scores_one(self):
         example = make_examples(
@@ -159,6 +201,15 @@ class MetaDataAnalysisLiteTests(unittest.TestCase):
         self.assertEqual(diagnostics["parseable"], 1.0)
         self.assertEqual(diagnostics["exact_one_result"], 1.0)
         self.assertEqual(diagnostics["code_fence"], 1.0)
+
+    def test_tool_response_diagnostics(self):
+        completion = [
+            {"role": "tool", "content": "{'answer': 4}"},
+            {"role": "tool", "content": "{'error': 'bad csv'}"},
+        ]
+        diagnostics = tool_response_diagnostics(completion)
+        self.assertEqual(diagnostics["tool_response_count"], 2.0)
+        self.assertEqual(diagnostics["tool_error_count"], 1.0)
 
 
 if __name__ == "__main__":

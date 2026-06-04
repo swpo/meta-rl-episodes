@@ -2,11 +2,11 @@ schema_version: 0.1.0
 episode_id: "2026-06-03-meta-data-analysis-lite-001"
 title: "Small-table arithmetic RL environment"
 created_at: "2026-06-03T16:31:30-05:00"
-updated_at: "2026-06-03T21:02:31-05:00"
+updated_at: "2026-06-04T06:50:00-05:00"
 agent:
   name: "Codex"
   model: "GPT-5"
-  notes: "Second clean-slate meta RL episode; focused on a no-tool table-arithmetic environment before any sandbox/tool extension."
+  notes: "Second clean-slate meta RL episode; started as a no-tool table-arithmetic environment, then added a cheap deterministic tool-mode extension."
 
 research_question: "Can a small model learn reliable tabular arithmetic over generated CSVs using a cheap deterministic reward, and where does difficulty appear as row count and task mix scale?"
 hypotheses:
@@ -17,7 +17,7 @@ hypotheses:
 environment:
   kind: "hub"
   id: "abugoot/meta-data-analysis-lite"
-  version: "0.1.1"
+  version: "0.2.1"
   dashboard_url: "https://app.primeintellect.ai/dashboard/environments/abugoot/meta-data-analysis-lite"
   local_path: "episodes/2026-06-03-meta-data-analysis-lite-001/env"
   entrypoint: "meta_data_analysis_lite.load_environment"
@@ -26,11 +26,20 @@ environment:
     name: "meta-data-analysis-lite"
     environment_id: "a6slfypd4rv7v2gkp0awdb24"
     version_id: ""
-    content_hash: "755796fa"
-    wheel_sha256: "ca04d3cf7522bcf5bf14b5199a868e30bd3b7c1836302393be937bae110ff12a"
-    pushed_at: "2026-06-03T20:41:04.812503"
+    content_hash: "fd2e9aec"
+    wheel_sha256: "81674c42cb183d2ee5c70a7fbc26b06f35a94a272f51e5b1ceacb8ba1f70f600"
+    pushed_at: "2026-06-04T06:25:23-05:00"
     visibility: "PUBLIC"
     action_status: "SUCCESS"
+  version_history:
+    - version: "0.1.1"
+      content_hash: "755796fa"
+      wheel_sha256: "ca04d3cf7522bcf5bf14b5199a868e30bd3b7c1836302393be937bae110ff12a"
+      notes: "No-tool first-pass environment and Llama 1B RL run."
+    - version: "0.2.1"
+      content_hash: "fd2e9aec"
+      wheel_sha256: "81674c42cb183d2ee5c70a7fbc26b06f35a94a272f51e5b1ceacb8ba1f70f600"
+      notes: "Optional deterministic analyze_table tool mode."
   env_args:
     seed: 20260603
     num_examples: 128
@@ -47,12 +56,18 @@ environment:
     - "Score the selected final result candidate rather than the best hidden candidate."
     - "Accept valid JSON outside tags with a format penalty."
     - "Coerce numeric strings for scoring, but reward schema prefers a JSON number."
-  tools: []
+  tools:
+    - name: "analyze_table"
+      version_added: "0.2.0"
+      cost_label: "tool-cheap"
+      description: "Computes the generated table question from CSV text and exact question; model must still emit the final result tag."
   known_risks:
     - "Version 0.1.0 passed numeric-only easy eval but failed mixed task loading because heterogeneous info fields were not Arrow-compatible; version 0.1.1 stores mixed metadata as JSON strings."
     - "Reward can improve via parseability and numeric near-misses while exact answer rate remains low."
     - "The current reward grants correctness credit to JSON outside result tags with a format penalty, which is useful for shaping but should be tracked."
     - "Step-specific adapter records can remain UPLOADING after completion; the step-null final adapter was the deployable one in this run."
+    - "Hosted Llama 1B failed before generation when tool calls were enabled, while no-tool evals still worked."
+    - "Tool-mode Qwen 2B can become too easy for enforced zero-advantage filtering; a 20-step run crashed after all rollouts were filtered."
 
 model_plan:
   default_probe_model: "meta-llama/Llama-3.2-1B-Instruct"
@@ -60,7 +75,7 @@ model_plan:
     - "Qwen/Qwen3.5-0.8B"
     - "Qwen/Qwen3.5-2B"
   token_budget_notes: "No-tool v0.1 fits within 512 output tokens. The 20-step run averaged short eval outputs after training, but tool variants may need larger ceilings."
-  expected_cost_notes: "No sandbox, judge model, or long multi-turn trajectory. The v0.1.1 1-step Llama smoke cost $0.0078 and the 20-step Llama run cost $0.10."
+  expected_cost_notes: "No sandbox or judge model. The v0.1.1 1-step Llama smoke cost $0.0078, the 20-step Llama run cost $0.10, and the completed v0.2.1 10-step Qwen 2B tool run cost $0.06."
 
 eval_smokes:
   - eval_id: "local-unit-tests-v011"
@@ -89,6 +104,19 @@ eval_smokes:
     truncation_rate: null
     error_rate: 0.0
     notes: "Regression check for the v0.1.0 mixed-task Arrow failure; output was 32."
+  - eval_id: "local-unit-tests-v021"
+    command: "PYTHONDONTWRITEBYTECODE=1 python -m pytest episodes/2026-06-03-meta-data-analysis-lite-001/env/test_meta_data_analysis_lite.py"
+    model: "n/a"
+    max_tokens: 0
+    num_examples: 0
+    rollouts_per_example: 0
+    status: "passed"
+    avg_reward: null
+    avg_input_tokens: null
+    avg_output_tokens: null
+    truncation_rate: null
+    error_rate: 0.0
+    notes: "19 tests passed and 2 optional dependency checks skipped locally after adding tool mode."
 
 evals:
   - eval_id: "base-easy-v011-local-706e854a"
@@ -327,11 +355,190 @@ hosted_runs:
       final_output_chars: 217.8046875
     notes: "First non-trivial RL run. The final deployable step-null adapter was evaluated on train and held-out seeds."
 
+tool_extension:
+  version: "0.2.1"
+  research_question: "Can a cheap deterministic tool turn the same table generator into a tool-use protocol RL task?"
+  tool_name: "analyze_table"
+  env_args:
+    seed: 20260603
+    num_examples: 128
+    min_rows: 8
+    max_rows: 12
+    task_families: "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+    tools: true
+    max_tool_turns: 3
+  base_evals:
+    - eval_id: "base-tools-llama1b-v020-local-a801924c"
+      model: "meta-llama/Llama-3.2-1B-Instruct"
+      env_version: "0.2.0"
+      status: "failed-provider"
+      output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_mixed_tools_seed20260603_llama1b_n16_v020/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct/a801924c/results.jsonl"
+      avg_reward: 0.0
+      error_rate: 1.0
+      auxiliary_metrics:
+        exact_answer: 0.0
+        total_tool_calls: 0.0
+      notes: "Hosted Llama 1B failed before generation with tool calls enabled; treated as provider/model tool-path incompatibility."
+    - eval_id: "base-notools-qwen2b-v021-local-575387dd"
+      model: "Qwen/Qwen3.5-2B"
+      env_version: "0.2.1"
+      status: "completed"
+      output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_mixed_notools_seed20260603_qwen2b_n16_v021/evals/meta-data-analysis-lite--Qwen--Qwen3.5-2B/575387dd/results.jsonl"
+      avg_reward: 0.43171295183205716
+      error_rate: 0.0
+      auxiliary_metrics:
+        parseable: 1.0
+        exact_one_result: 0.5625
+        exact_answer: 0.0625
+        answer_score: 0.28311726910940954
+        total_tool_calls: 0.0
+      notes: "Qwen 2B formats well without tools but exact arithmetic remains low."
+    - eval_id: "base-tools-qwen2b-v021-local-46e3caac"
+      model: "Qwen/Qwen3.5-2B"
+      env_version: "0.2.1"
+      status: "completed"
+      output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_mixed_tools_seed20260603_qwen2b_n16_v021_t3/evals/meta-data-analysis-lite--Qwen--Qwen3.5-2B/46e3caac/results.jsonl"
+      avg_reward: 0.3125
+      error_rate: 0.0
+      auxiliary_metrics:
+        parseable: 0.3125
+        exact_one_result: 0.3125
+        exact_answer: 0.3125
+        answer_score: 0.3125
+        total_tool_calls: 2.375
+        tool_error_count: 0.0625
+      notes: "Tool access improves exact answers when the model finalizes, but base behavior loops tool calls and underperforms reward."
+  hosted_runs:
+    - run_id: "gvq9mq8ppx0a4g3rwsx77215"
+      dashboard_url: "https://app.primeintellect.ai/dashboard/training/gvq9mq8ppx0a4g3rwsx77215"
+      config_path: "episodes/2026-06-03-meta-data-analysis-lite-001/configs/qwen2b_1step_v021_tools.toml"
+      model: "Qwen/Qwen3.5-2B"
+      status: "completed"
+      max_steps: 1
+      batch_size: 64
+      rollouts_per_example: 4
+      cost_usd: 0.01
+      final_step: 0
+      final_reward: 0.58671875
+      auxiliary_metrics:
+        exact_answer: 0.59375
+        answer_score: 0.59375
+        total_tool_calls: 1.84375
+        tool_error_count: 0.015625
+        zero_advantage_filter: 0.3125
+      notes: "Hosted Qwen 2B tool-mode smoke."
+    - run_id: "cw41toqvv97d0ba5q8e199wx"
+      dashboard_url: "https://app.primeintellect.ai/dashboard/training/cw41toqvv97d0ba5q8e199wx"
+      config_path: "episodes/2026-06-03-meta-data-analysis-lite-001/configs/qwen2b_20step_v021_tools.toml"
+      model: "Qwen/Qwen3.5-2B"
+      status: "stopped"
+      max_steps: 20
+      batch_size: 64
+      rollouts_per_example: 4
+      cost_usd: 0.0
+      final_step: null
+      final_reward: null
+      notes: "Stalled before useful metrics and was stopped manually."
+    - run_id: "x36l212xgveqr6qgnsske6jk"
+      dashboard_url: "https://app.primeintellect.ai/dashboard/training/x36l212xgveqr6qgnsske6jk"
+      config_path: "episodes/2026-06-03-meta-data-analysis-lite-001/configs/qwen2b_20step_v021_tools_b32r2.toml"
+      model: "Qwen/Qwen3.5-2B"
+      status: "failed"
+      max_steps: 20
+      batch_size: 32
+      rollouts_per_example: 2
+      cost_usd: 0.08
+      final_step: 13
+      final_reward: 0.875
+      best_logged_reward: 0.9976666666666667
+      best_logged_reward_step: 10
+      checkpoint_ids:
+        - "ji7eu94pufsgzpc8dm93suyf"
+        - "rlp6o99npkgwkbh4hn4jqre0"
+      adapter_ids:
+        - "d3nlotc6wr3esj6qgv142amq"
+        - "a27eolds2h7md0bv3zfoq3wp"
+      notes: "Useful dynamics trace; crashed at step 14 after all rollouts were zero-advantage on three consecutive attempts."
+    - run_id: "ic5nrtiex0w2zuuf421ox451"
+      dashboard_url: "https://app.primeintellect.ai/dashboard/training/ic5nrtiex0w2zuuf421ox451"
+      config_path: "episodes/2026-06-03-meta-data-analysis-lite-001/configs/qwen2b_10step_v021_tools_b32r2.toml"
+      model: "Qwen/Qwen3.5-2B"
+      status: "completed"
+      max_steps: 10
+      batch_size: 32
+      rollouts_per_example: 2
+      cost_usd: 0.06
+      final_step: 9
+      final_reward: 0.9978125
+      adapter_ids:
+        - "pdfn3guyfg0b35kvbxf3j2n6"
+      auxiliary_metrics:
+        final_parseable: 1.0
+        final_exact_one_result: 0.96875
+        final_exact_answer: 1.0
+        final_answer_score: 1.0
+        final_total_tool_calls: 1.0
+        final_tool_error_count: 0.0
+        final_zero_advantage_filter: 0.9375
+      notes: "Capped rerun completed before the all-filtered crash region and produced the deployed final adapter."
+  trained_evals:
+    - eval_id: "trained-tools-train-qwen2b-v021-run-ic5-local-6748d292"
+      eval_type: "trained-train"
+      model: "Qwen/Qwen3.5-2B:pdfn3guyfg0b35kvbxf3j2n6"
+      linked_run_id: "ic5nrtiex0w2zuuf421ox451"
+      adapter_id: "pdfn3guyfg0b35kvbxf3j2n6"
+      seed: 20260603
+      split: "train-seed"
+      output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_ic5nrtiex0w2zuuf421ox451/trained_mixed_tools_seed20260603_qwen2b_n16_v021/evals/meta-data-analysis-lite--Qwen--Qwen3.5-2B:pdfn3guyfg0b35kvbxf3j2n6/6748d292/results.jsonl"
+      avg_reward: 0.9779687499999999
+      error_rate: 0.0
+      avg_input_tokens: 1872.125
+      avg_output_tokens: 373.25
+      auxiliary_metrics:
+        parseable: 1.0
+        exact_one_result: 0.75
+        exact_answer: 1.0
+        answer_score: 1.0
+        total_tool_calls: 1.0
+        tool_error_count: 0.0
+      notes: "Correct answers with one tool call throughout; reward loss comes from exact-one-result formatting on a few cases."
+    - eval_id: "trained-tools-heldout-qwen2b-v021-run-ic5-local-85b26645"
+      eval_type: "trained-heldout"
+      model: "Qwen/Qwen3.5-2B:pdfn3guyfg0b35kvbxf3j2n6"
+      linked_run_id: "ic5nrtiex0w2zuuf421ox451"
+      adapter_id: "pdfn3guyfg0b35kvbxf3j2n6"
+      seed: 424242
+      split: "held-out-seed"
+      output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_ic5nrtiex0w2zuuf421ox451/trained_mixed_tools_seed424242_qwen2b_n16_v021/evals/meta-data-analysis-lite--Qwen--Qwen3.5-2B:pdfn3guyfg0b35kvbxf3j2n6/85b26645/results.jsonl"
+      avg_reward: 1.0
+      error_rate: 0.0
+      avg_input_tokens: 1850.9375
+      avg_output_tokens: 327.4375
+      auxiliary_metrics:
+        parseable: 1.0
+        exact_one_result: 1.0
+        exact_answer: 1.0
+        answer_score: 1.0
+        total_tool_calls: 1.0
+        tool_error_count: 0.0
+      notes: "Perfect 16-example held-out tool-mode eval."
+  findings:
+    summary: "Tool-mode RL teaches Qwen 2B to call the deterministic tool once and synthesize the final answer."
+    lessons:
+      - "Tool access alone can reduce reward if the base policy loops tool calls or fails to finalize."
+      - "The decisive metrics are total_tool_calls, tool_error_count, exact_one_result, exact_answer, and zero_advantage filtering."
+      - "A 10-step capped run is a better default than 20 steps for this easy tool-mode rung."
+    failure_modes:
+      - "Hosted Llama 1B tool calls failed before generation."
+      - "The 20-step Qwen run crashed after zero-advantage filtering removed all rollouts on repeated attempts."
+    reward_hacking_observed: false
+    reward_hacking_notes: "No candidate stuffing was observed in the successful tool-mode run; the main issue was task saturation and zero-advantage collapse."
+
 artifact_links:
   - label: "Prime environment"
     kind: "url"
     url_or_path: "https://app.primeintellect.ai/dashboard/environments/abugoot/meta-data-analysis-lite"
-    notes: "Public Hub environment, latest version 0.1.1."
+    notes: "Public Hub environment, latest version 0.2.1."
   - label: "20-step Prime run"
     kind: "url"
     url_or_path: "https://app.primeintellect.ai/dashboard/training/lv05ttq2v7kd7l628qdstxjz"
@@ -348,29 +555,40 @@ artifact_links:
     kind: "local_file"
     url_or_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_lv05ttq2v7kd7l628qdstxjz/trained_mixed_seed424242_llama1b_n16_v011/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss/b299410c/metadata.json"
     notes: "Held-out eval for deployed adapter from run lv05ttq2v7kd7l628qdstxjz."
+  - label: "Qwen tool-mode capped run"
+    kind: "url"
+    url_or_path: "https://app.primeintellect.ai/dashboard/training/ic5nrtiex0w2zuuf421ox451"
+    notes: "Completed 10-step v0.2.1 tool-mode run."
+  - label: "Qwen tool-mode held-out eval"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_ic5nrtiex0w2zuuf421ox451/trained_mixed_tools_seed424242_qwen2b_n16_v021/evals/meta-data-analysis-lite--Qwen--Qwen3.5-2B:pdfn3guyfg0b35kvbxf3j2n6/85b26645/metadata.json"
+    notes: "Held-out eval for deployed Qwen tool-mode adapter from run ic5nrtiex0w2zuuf421ox451."
 
 cost_summary:
-  total_cost_usd: 0.1078
-  notes: "Hosted RL costs only: $0.0078 smoke plus $0.10 for the 20-step run. Eval inference token usage is recorded in metadata but not priced here."
+  total_cost_usd: 0.2578
+  notes: "Hosted RL/training costs only: $0.0078 Llama smoke, $0.10 Llama 20-step, $0.01 Qwen tool smoke, $0.00 stalled Qwen attempt, $0.08 failed-but-useful Qwen 20-step, and $0.06 completed Qwen 10-step. Eval inference token usage is recorded in metadata but not priced here."
 
 findings:
-  summary: "Llama 1B learns strong format compliance and partial table arithmetic on the mixed rung, but does not solve exact answers reliably."
+  summary: "The no-tool version shows partial arithmetic learning with Llama 1B; the tool-mode version shows Qwen 2B learning a reliable one-call tool protocol."
   success_criteria_met: true
   lessons:
     - "The mixed table rung gives a cheap non-trivial RL signal: base held-out reward 0.0113 -> trained held-out reward 0.4647."
     - "Parseability can saturate while exact-answer rate remains low, so exact-answer and answer-score should be logged separately from reward."
-    - "The current no-tool baseline is useful before adding tool use; tool variants should be compared against this same generator."
+    - "Tool access alone can lower reward when the base policy loops tool calls; log tool count, tool errors, and max-turn behavior."
+    - "The completed Qwen 2B tool run learned one tool call and reached held-out reward 1.0, but a longer run crashed once zero-advantage filtering removed all variation."
     - "Mixed metadata fields in generated examples should be JSON-serialized to avoid Arrow schema failures."
   failure_modes:
     - "v0.1.0 mixed eval failed on Arrow-incompatible heterogeneous info metadata."
     - "Step-specific final adapter records remained UPLOADING; the step-null final adapter was the usable deployment artifact."
     - "The model often returns valid JSON outside required result tags, receiving partial reward but failing exact-one-result."
+    - "Hosted Llama 1B failed with tool calls before generation."
+    - "The 20-step Qwen tool run failed from all-filtered zero-advantage batches once the task became too easy."
   reward_hacking_observed: false
   reward_hacking_notes: "No candidate stuffing or truncation-based exploit emerged. The main reward gap is shaped partial credit for near-miss arithmetic and JSON outside tags."
 
 next_steps:
-  - "Commit and push the completed first-pass episode on branch codex/meta-data-analysis-lite."
-  - "Optionally run a harder no-tool rung with 14-20 rows before model scaling."
-  - "Design a tool-enabled version over the same generator without introducing sandbox costs yet."
+  - "Commit and push the completed tool-mode episode extension on branch codex/meta-data-analysis-tools."
+  - "Increase tool-mode difficulty before further scaling: larger tables, irrelevant columns, or examples where the tool is not always necessary."
+  - "Use Qwen 2B with the capped 10-step config as the recommended default for future agents testing this env version."
 
-status: "completed-first-pass"
+status: "completed-tool-extension"

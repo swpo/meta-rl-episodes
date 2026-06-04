@@ -1,0 +1,28 @@
+# Diagnostic 20-step RL probe for meta-data-analysis-lite v0.2.1 tool mode.
+#
+# This larger batch attempt stalled before useful samples in the first episode.
+# Prefer qwen2b_10step_v021_tools_b32r2.toml as the default live probe.
+#
+# Expected command:
+# prime train episodes/2026-06-03-meta-data-analysis-lite-001/configs/qwen2b_20step_v021_tools.toml --yes --plain
+
+model = "Qwen/Qwen3.5-2B"
+max_steps = 20
+batch_size = 64
+rollouts_per_example = 4
+
+[sampling]
+max_tokens = 1024
+
+[[env]]
+id = "abugoot/meta-data-analysis-lite@0.2.1"
+name = "meta_data_analysis_lite_qwen2b_20step_v021_tools"
+
+[env.args]
+seed = 20260603
+num_examples = 128
+min_rows = 8
+max_rows = 12
+task_families = "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+tools = true
+max_tool_turns = 3

@@ -1,0 +1,28 @@
+# Diagnostic Prime hosted smoke for meta-data-analysis-lite v0.2.1 tool mode.
+#
+# As of 2026-06-04, the hosted Llama 1B provider path failed with tool calls
+# before generation. Prefer the Qwen 2B tool configs for live tool-mode probes.
+#
+# Expected command after pushing the env to Prime Hub:
+# prime train episodes/2026-06-03-meta-data-analysis-lite-001/configs/llama1b_1step_v021_tools.toml --yes --plain
+
+model = "meta-llama/Llama-3.2-1B-Instruct"
+max_steps = 1
+batch_size = 64
+rollouts_per_example = 4
+
+[sampling]
+max_tokens = 1024
+
+[[env]]
+id = "abugoot/meta-data-analysis-lite@0.2.1"
+name = "meta_data_analysis_lite_llama1b_1step_v021_tools"
+
+[env.args]
+seed = 20260603
+num_examples = 128
+min_rows = 8
+max_rows = 12
+task_families = "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+tools = true
+max_tool_turns = 3

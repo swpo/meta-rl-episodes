@@ -10,6 +10,17 @@ from typing import Any
 REGIONS = ["north", "south", "east", "west"]
 PRODUCTS = ["alpha", "beta", "gamma", "delta"]
 CHANNELS = ["online", "retail"]
+CSV_COLUMNS = [
+    "row_id",
+    "region",
+    "product",
+    "channel",
+    "units",
+    "returns",
+    "net_units",
+    "unit_price",
+    "revenue",
+]
 TASK_FAMILIES = [
     "sum_units_by_region",
     "sum_revenue_by_product",
@@ -66,19 +77,8 @@ def make_rows(rng: random.Random, num_rows: int) -> list[dict[str, Any]]:
 
 
 def table_csv(rows: list[dict[str, Any]]) -> str:
-    fieldnames = [
-        "row_id",
-        "region",
-        "product",
-        "channel",
-        "units",
-        "returns",
-        "net_units",
-        "unit_price",
-        "revenue",
-    ]
     buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=fieldnames, lineterminator="\n")
+    writer = csv.DictWriter(buffer, fieldnames=CSV_COLUMNS, lineterminator="\n")
     writer.writeheader()
     writer.writerows(rows)
     return buffer.getvalue().strip()
@@ -95,6 +95,135 @@ def _sum(rows: list[dict[str, Any]], column: str, **filters: str) -> int:
         if all(str(row[key]) == value for key, value in filters.items()):
             total += int(row[column])
     return total
+
+
+def _rows_from_csv(csv_text: str) -> list[dict[str, Any]]:
+    if not isinstance(csv_text, str) or not csv_text.strip():
+        raise ValueError("csv_text must be a non-empty CSV string")
+    reader = csv.DictReader(io.StringIO(csv_text.strip()))
+    missing = [column for column in CSV_COLUMNS if column not in (reader.fieldnames or [])]
+    if missing:
+        raise ValueError(f"missing CSV columns: {', '.join(missing)}")
+
+    rows: list[dict[str, Any]] = []
+    for raw in reader:
+        row = dict(raw)
+        for column in ["units", "returns", "net_units", "unit_price", "revenue"]:
+            row[column] = int(str(row[column]).strip())
+        for column in ["region", "product", "channel", "row_id"]:
+            row[column] = str(row[column]).strip().lower()
+        rows.append(row)
+    if not rows:
+        raise ValueError("CSV contains no data rows")
+    return rows
+
+
+def _answer_question_from_rows(
+    rows: list[dict[str, Any]], question: str
+) -> tuple[Any, str, dict[str, Any]]:
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("question must be a non-empty string")
+    normalized = " ".join(question.strip().split())
+
+    match = re.fullmatch(
+        r"What is the total net_units for rows where region is ([a-z]+)\??",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        region = match.group(1).lower()
+        return _sum(rows, "net_units", region=region), "sum_units_by_region", {
+            "region": region
+        }
+
+    match = re.fullmatch(
+        r"What is the total revenue for rows where product is ([a-z]+)\??",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        product = match.group(1).lower()
+        return _sum(rows, "revenue", product=product), "sum_revenue_by_product", {
+            "product": product
+        }
+
+    match = re.fullmatch(
+        r"How many rows have channel ([a-z]+) and net_units greater than or equal to (\d+)\??",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        channel = match.group(1).lower()
+        threshold = int(match.group(2))
+        answer = sum(
+            1
+            for row in rows
+            if str(row["channel"]) == channel and int(row["net_units"]) >= threshold
+        )
+        return answer, "count_rows_filter", {
+            "channel": channel,
+            "min_net_units": threshold,
+        }
+
+    if re.fullmatch(
+        r"Which region has the highest total revenue\? If there is a tie, choose the alphabetically first region\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    ):
+        totals = {region: _sum(rows, "revenue", region=region) for region in REGIONS}
+        answer = sorted(totals.items(), key=lambda item: (-item[1], item[0]))[0][0]
+        return answer, "max_region_revenue", {"totals": totals}
+
+    match = re.fullmatch(
+        r"What is the difference between total revenue for product ([a-z]+) and total revenue for product ([a-z]+)\? Compute \1 minus \2\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        first = match.group(1).lower()
+        second = match.group(2).lower()
+        answer = _sum(rows, "revenue", product=first) - _sum(rows, "revenue", product=second)
+        return answer, "diff_product_revenue", {
+            "product_a": first,
+            "product_b": second,
+        }
+
+    match = re.fullmatch(
+        r"What is the average unit_price for rows where channel is ([a-z]+)\? Round to two decimal places\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        channel = match.group(1).lower()
+        prices = [int(row["unit_price"]) for row in rows if str(row["channel"]) == channel]
+        answer = round(sum(prices) / len(prices), 2) if prices else 0.0
+        return answer, "avg_unit_price_by_channel", {"channel": channel}
+
+    raise ValueError("question did not match a supported generated task")
+
+
+def analyze_table(csv_text: str, question: str) -> dict[str, Any]:
+    """Compute one generated table question from CSV text.
+
+    Args:
+        csv_text: The CSV table from the prompt, including the header row.
+        question: The exact natural-language question from the prompt.
+
+    Returns:
+        A JSON object with `answer`, `task_family`, and `target`. Use the
+        `answer` field in the final `<result>{"answer": ...}</result>` reply.
+    """
+    try:
+        rows = _rows_from_csv(csv_text)
+        answer, task_family, target = _answer_question_from_rows(rows, question)
+    except Exception as exc:
+        return {"error": str(exc)}
+    return {
+        "answer": answer,
+        "task_family": task_family,
+        "target": target,
+        "num_rows": len(rows),
+    }
 
 
 def _question_for_family(
@@ -204,6 +333,7 @@ def make_examples(
     min_rows: int = 8,
     max_rows: int = 12,
     task_families: str | list[str] | tuple[str, ...] | None = None,
+    tools_enabled: bool = False,
 ) -> list[dict[str, Any]]:
     if min_rows < 4:
         raise ValueError("min_rows must be at least 4")
@@ -220,8 +350,18 @@ def make_examples(
         family = rng.choice(families)
         question, answer_payload = _question_for_family(rows, family, rng)
         placeholder = 0 if answer_payload["answer_type"] == "number" else "name"
+        tool_instruction = ""
+        if tools_enabled:
+            tool_instruction = (
+                "You may call the analyze_table tool with the CSV text and the "
+                "exact question to compute the answer. Tool outputs are not final "
+                "answers. If you use the tool, call analyze_table at most once, "
+                "then immediately finish with one <result>...</result> tag using "
+                "the tool's answer field.\n"
+            )
         prompt = (
             "Analyze the CSV table and answer the question exactly.\n"
+            f"{tool_instruction}"
             "Return only one <result>...</result> tag containing JSON with exactly "
             'one key, "answer". Do not use code fences.\n'
             "For numeric answers, return a JSON number. For string answers, use the "
@@ -246,6 +386,7 @@ def make_examples(
                     "answer_type": answer_payload["answer_type"],
                     "task_family": answer_payload["task_family"],
                     "target_json": json.dumps(answer_payload["target"], sort_keys=True),
+                    "tools_enabled": tools_enabled,
                 },
             }
         )
@@ -532,6 +673,24 @@ def completion_diagnostics(completion: Any) -> dict[str, float]:
     return response_diagnostics(assistant_contents[-1])
 
 
+def tool_response_diagnostics(completion: Any) -> dict[str, float]:
+    if not isinstance(completion, list):
+        return {"tool_response_count": 0.0, "tool_error_count": 0.0}
+    response_count = 0
+    error_count = 0
+    for message in completion:
+        if _message_role(message) != "tool":
+            continue
+        response_count += 1
+        content = _message_content(message)
+        if isinstance(content, str) and "error" in content.lower():
+            error_count += 1
+    return {
+        "tool_response_count": float(response_count),
+        "tool_error_count": float(error_count),
+    }
+
+
 def _message_role(message: Any) -> Any:
     if isinstance(message, dict):
         return message.get("role")
@@ -550,17 +709,21 @@ def load_environment(
     max_rows: int = 12,
     seed: int = 20260603,
     task_families: str | list[str] | tuple[str, ...] | None = None,
+    tools: bool | str = False,
+    max_tool_turns: int = 2,
     **kwargs: Any,
 ):
     from datasets import Dataset
     import verifiers as vf
 
+    tools_enabled = _normalize_bool(tools)
     examples = make_examples(
         seed=seed,
         num_examples=num_examples,
         min_rows=min_rows,
         max_rows=max_rows,
         task_families=task_families,
+        tools_enabled=tools_enabled,
     )
 
     async def weighted_reward(completion, answer, **kwargs):
@@ -593,6 +756,12 @@ def load_environment(
     async def numeric_abs_error(completion, answer, **kwargs):
         return answer_diagnostics(completion, answer)["numeric_abs_error"]
 
+    async def tool_response_count(completion, **kwargs):
+        return tool_response_diagnostics(completion)["tool_response_count"]
+
+    async def tool_error_count(completion, **kwargs):
+        return tool_response_diagnostics(completion)["tool_error_count"]
+
     dataset = Dataset.from_list(examples)
     rubric = vf.Rubric()
     rubric.add_reward_func(weighted_reward, weight=1.0)
@@ -605,4 +774,25 @@ def load_environment(
     rubric.add_metric(exact_answer)
     rubric.add_metric(answer_score)
     rubric.add_metric(numeric_abs_error)
+    rubric.add_metric(tool_response_count)
+    rubric.add_metric(tool_error_count)
+    if tools_enabled:
+        return vf.ToolEnv(
+            dataset=dataset,
+            rubric=rubric,
+            tools=[analyze_table],
+            max_turns=max_tool_turns,
+        )
     return vf.SingleTurnEnv(dataset=dataset, rubric=rubric)
+
+
+def _normalize_bool(value: bool | str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y", "tools"}:
+            return True
+        if normalized in {"0", "false", "no", "n", ""}:
+            return False
+    raise ValueError(f"cannot interpret boolean value: {value!r}")
