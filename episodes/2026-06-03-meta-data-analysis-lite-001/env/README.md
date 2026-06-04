@@ -12,7 +12,7 @@ tag:
 <result>{"answer": 123}</result>
 ```
 
-The initial v0.1.0 task families are:
+The initial v0.1 task families are:
 
 - total `net_units` by region
 - total `revenue` by product

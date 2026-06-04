@@ -1,0 +1,8 @@
+2026-06-03 20:43:13 - verifiers.utils.env_utils - INFO - Loading environment: meta-data-analysis-lite
+2026-06-03 20:43:13 - verifiers.utils.env_utils - INFO - Using provided args: min_rows=8, seed=424242, max_rows=12, num_examples=128, task_families=sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel
+2026-06-03 20:43:13 - verifiers.utils.env_utils - INFO - Successfully loaded environment 'meta-data-analysis-lite'
+2026-06-03 20:43:13 - verifiers.utils.thread_utils - INFO - Scaled default executor and 0 registered executor(s) ()
+2026-06-03 20:43:13 - verifiers.serve.server.env_worker.EnvWorker - INFO - Initialized worker meta-data-analysis-lite-0 on ipc:///tmp/vf-ad66664ba421-meta-data-analysis-lite-0
+2026-06-03 20:43:13 - verifiers.serve.server.env_worker.EnvWorker - INFO - Starting worker meta-data-analysis-lite-0
+2026-06-03 20:43:20 - verifiers.utils.process_utils - INFO - Death pipe closed — parent is gone, sending SIGTERM to self
+2026-06-03 20:43:20 - verifiers.serve.server.env_worker.EnvWorker - INFO - Shut down worker meta-data-analysis-lite-0

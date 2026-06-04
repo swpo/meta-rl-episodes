@@ -34,6 +34,15 @@ class MetaDataAnalysisLiteTests(unittest.TestCase):
             self.assertEqual(examples[0]["info"]["task_family"], family)
             self.assertIn("Question:", examples[0]["prompt"][0]["content"])
 
+    def test_mixed_task_families_are_arrow_compatible(self):
+        try:
+            from datasets import Dataset
+        except Exception as exc:
+            self.skipTest(f"datasets unavailable: {exc}")
+        examples = make_examples(seed=11, num_examples=32, min_rows=8, max_rows=12)
+        dataset = Dataset.from_list(examples)
+        self.assertEqual(len(dataset), 32)
+
     def test_exact_numeric_json_scores_one(self):
         example = make_examples(
             seed=12,

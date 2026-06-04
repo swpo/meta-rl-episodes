@@ -2,11 +2,11 @@ schema_version: 0.1.0
 episode_id: "2026-06-03-meta-data-analysis-lite-001"
 title: "Small-table arithmetic RL environment"
 created_at: "2026-06-03T16:31:30-05:00"
-updated_at: "2026-06-03T16:35:13-05:00"
+updated_at: "2026-06-03T21:02:31-05:00"
 agent:
   name: "Codex"
   model: "GPT-5"
-  notes: "Second clean-slate meta RL episode; scaffolded locally after completing meta-memory-state."
+  notes: "Second clean-slate meta RL episode; focused on a no-tool table-arithmetic environment before any sandbox/tool extension."
 
 research_question: "Can a small model learn reliable tabular arithmetic over generated CSVs using a cheap deterministic reward, and where does difficulty appear as row count and task mix scale?"
 hypotheses:
@@ -15,12 +15,22 @@ hypotheses:
   - "Row count and task-family mix should give an interpretable difficulty ladder before model scaling."
 
 environment:
-  kind: "local"
-  id: "meta-data-analysis-lite"
-  version: "0.1.0"
-  dashboard_url: ""
+  kind: "hub"
+  id: "abugoot/meta-data-analysis-lite"
+  version: "0.1.1"
+  dashboard_url: "https://app.primeintellect.ai/dashboard/environments/abugoot/meta-data-analysis-lite"
   local_path: "episodes/2026-06-03-meta-data-analysis-lite-001/env"
   entrypoint: "meta_data_analysis_lite.load_environment"
+  hub:
+    owner: "abugoot"
+    name: "meta-data-analysis-lite"
+    environment_id: "a6slfypd4rv7v2gkp0awdb24"
+    version_id: ""
+    content_hash: "755796fa"
+    wheel_sha256: "ca04d3cf7522bcf5bf14b5199a868e30bd3b7c1836302393be937bae110ff12a"
+    pushed_at: "2026-06-03T20:41:04.812503"
+    visibility: "PUBLIC"
+    action_status: "SUCCESS"
   env_args:
     seed: 20260603
     num_examples: 128
@@ -39,20 +49,21 @@ environment:
     - "Coerce numeric strings for scoring, but reward schema prefers a JSON number."
   tools: []
   known_risks:
-    - "Easy rungs may mostly train formatting if arithmetic is too simple."
-    - "Numeric closeness can improve while exact answer rate remains low."
-    - "Multiple-candidate outputs must remain penalized to avoid answer stuffing."
+    - "Version 0.1.0 passed numeric-only easy eval but failed mixed task loading because heterogeneous info fields were not Arrow-compatible; version 0.1.1 stores mixed metadata as JSON strings."
+    - "Reward can improve via parseability and numeric near-misses while exact answer rate remains low."
+    - "The current reward grants correctness credit to JSON outside result tags with a format penalty, which is useful for shaping but should be tracked."
+    - "Step-specific adapter records can remain UPLOADING after completion; the step-null final adapter was the deployable one in this run."
 
 model_plan:
   default_probe_model: "meta-llama/Llama-3.2-1B-Instruct"
   capability_probe_models:
     - "Qwen/Qwen3.5-0.8B"
     - "Qwen/Qwen3.5-2B"
-  token_budget_notes: "No-tool v0.1 should fit within 512 output tokens; tool/sandbox variants may need larger ceilings."
-  expected_cost_notes: "Expected cheap because there is no sandbox, judge model, or long multi-turn trajectory."
+  token_budget_notes: "No-tool v0.1 fits within 512 output tokens. The 20-step run averaged short eval outputs after training, but tool variants may need larger ceilings."
+  expected_cost_notes: "No sandbox, judge model, or long multi-turn trajectory. The v0.1.1 1-step Llama smoke cost $0.0078 and the 20-step Llama run cost $0.10."
 
 eval_smokes:
-  - eval_id: "local-unit-tests-v01"
+  - eval_id: "local-unit-tests-v011"
     command: "PYTHONDONTWRITEBYTECODE=1 python -m pytest episodes/2026-06-03-meta-data-analysis-lite-001/env/test_meta_data_analysis_lite.py"
     model: "n/a"
     max_tokens: 0
@@ -64,36 +75,302 @@ eval_smokes:
     avg_output_tokens: null
     truncation_rate: null
     error_rate: 0.0
-    notes: "15 local tests passed; covers deterministic generation, task families, parser/reward behavior, candidate stuffing penalties, and diagnostics."
-evals: []
-hosted_runs: []
+    notes: "15 tests passed and 1 optional datasets test skipped locally; covers deterministic generation, task families, parser/reward behavior, candidate-stuffing penalties, diagnostics, and hosted-style answer signatures."
+  - eval_id: "arrow-compat-v011-prime-python"
+    command: "/Users/spoho/.local/share/uv/tools/prime/bin/python3 -c 'import sys; sys.path.insert(0, \"episodes/2026-06-03-meta-data-analysis-lite-001/env\"); from datasets import Dataset; import meta_data_analysis_lite as m; ds = Dataset.from_list(m.make_examples(seed=11, num_examples=32, min_rows=8, max_rows=12)); print(len(ds))'"
+    model: "n/a"
+    max_tokens: 0
+    num_examples: 32
+    rollouts_per_example: 0
+    status: "passed"
+    avg_reward: null
+    avg_input_tokens: null
+    avg_output_tokens: null
+    truncation_rate: null
+    error_rate: 0.0
+    notes: "Regression check for the v0.1.0 mixed-task Arrow failure; output was 32."
+
+evals:
+  - eval_id: "base-easy-v011-local-706e854a"
+    eval_type: "base-easy"
+    command: "prime eval run abugoot/meta-data-analysis-lite@0.1.1 -m meta-llama/Llama-3.2-1B-Instruct -n 16 -r 1 -c 4 -a '{\"seed\":20260603,\"num_examples\":128,\"min_rows\":6,\"max_rows\":8,\"task_families\":\"sum_units_by_region,sum_revenue_by_product,count_rows_filter\"}' --max-tokens 512 --temperature 0.7 --max-retries 2 --save-results --skip-upload --output-dir episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_easy_seed20260603_llama1b_n16_v011 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-data-analysis-lite"
+    env_version: "0.1.1"
+    env_args:
+      seed: 20260603
+      num_examples: 128
+      min_rows: 6
+      max_rows: 8
+      task_families: "sum_units_by_region,sum_revenue_by_product,count_rows_filter"
+    seed: 20260603
+    split: "train-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 16
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_easy_seed20260603_llama1b_n16_v011/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct/706e854a/results.jsonl"
+    avg_reward: 0.05671875
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 262.125
+    avg_output_tokens: 18.0
+    auxiliary_metrics:
+      parseable: 0.25
+      exact_one_result: 0.0
+      exact_answer: 0.0
+      answer_score: 0.015625
+      multi_candidate: 0.0
+      code_fence: 0.0
+      output_chars: 61.8125
+    notes: "Easy v0.1.1 base eval remained low reward but completed cleanly."
+  - eval_id: "base-mixed-v011-local-8833d2d8"
+    eval_type: "base-train"
+    command: "prime eval run abugoot/meta-data-analysis-lite@0.1.1 -m meta-llama/Llama-3.2-1B-Instruct -n 16 -r 1 -c 4 -a '{\"seed\":20260603,\"num_examples\":128,\"min_rows\":8,\"max_rows\":12,\"task_families\":\"sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel\"}' --max-tokens 512 --temperature 0.7 --max-retries 2 --save-results --skip-upload --output-dir episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_mixed_seed20260603_llama1b_n16_v011 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-data-analysis-lite"
+    env_version: "0.1.1"
+    env_args:
+      seed: 20260603
+      num_examples: 128
+      min_rows: 8
+      max_rows: 12
+      task_families: "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+    seed: 20260603
+    split: "train-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 16
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_mixed_seed20260603_llama1b_n16_v011/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct/8833d2d8/results.jsonl"
+    avg_reward: 0.0225
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 328.25
+    avg_output_tokens: 20.0
+    auxiliary_metrics:
+      parseable: 0.125
+      exact_one_result: 0.0
+      exact_answer: 0.0
+      answer_score: 0.0
+      multi_candidate: 0.0
+      code_fence: 0.0
+      output_chars: 73.6875
+    notes: "Main pre-RL baseline for the mixed rung."
+  - eval_id: "base-heldout-v011-local-2d7d8e33"
+    eval_type: "base-heldout"
+    command: "prime eval run abugoot/meta-data-analysis-lite@0.1.1 -m meta-llama/Llama-3.2-1B-Instruct -n 16 -r 1 -c 4 -a '{\"seed\":424242,\"num_examples\":128,\"min_rows\":8,\"max_rows\":12,\"task_families\":\"sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel\"}' --max-tokens 512 --temperature 0.7 --max-retries 2 --save-results --skip-upload --output-dir episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_mixed_seed424242_llama1b_n16_v011 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-data-analysis-lite"
+    env_version: "0.1.1"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_rows: 8
+      max_rows: 12
+      task_families: "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 16
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/base_mixed_seed424242_llama1b_n16_v011/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct/2d7d8e33/results.jsonl"
+    avg_reward: 0.01125
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 326.1875
+    avg_output_tokens: 34.9375
+    auxiliary_metrics:
+      parseable: 0.0625
+      exact_one_result: 0.0
+      exact_answer: 0.0
+      answer_score: 0.0
+      multi_candidate: 0.0
+      code_fence: 0.0
+      output_chars: 92.5
+    notes: "Held-out pre-RL baseline."
+  - eval_id: "trained-mixed-v011-run-lv05-local-56b2131f"
+    eval_type: "trained-train"
+    command: "prime eval run abugoot/meta-data-analysis-lite@0.1.1 -m meta-llama/Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss -n 16 -r 1 -c 4 -a '{\"seed\":20260603,\"num_examples\":128,\"min_rows\":8,\"max_rows\":12,\"task_families\":\"sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel\"}' --max-tokens 512 --temperature 0.7 --max-retries 2 --save-results --skip-upload --output-dir episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_lv05ttq2v7kd7l628qdstxjz/trained_mixed_seed20260603_llama1b_n16_v011 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss"
+    env_id: "abugoot/meta-data-analysis-lite"
+    env_version: "0.1.1"
+    linked_run_id: "lv05ttq2v7kd7l628qdstxjz"
+    adapter_id: "tdygoem4x7kvo97ghqcpxtss"
+    env_args:
+      seed: 20260603
+      num_examples: 128
+      min_rows: 8
+      max_rows: 12
+      task_families: "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+    seed: 20260603
+    split: "train-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 16
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_lv05ttq2v7kd7l628qdstxjz/trained_mixed_seed20260603_llama1b_n16_v011/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss/56b2131f/results.jsonl"
+    avg_reward: 0.6541151393405851
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 352.25
+    avg_output_tokens: 37.0625
+    auxiliary_metrics:
+      parseable: 1.0
+      exact_one_result: 0.375
+      exact_answer: 0.1875
+      answer_score: 0.59715351912078
+      multi_candidate: 0.0
+      code_fence: 0.0
+      output_chars: 140.5625
+    notes: "Trained adapter substantially improves reward and answer_score on the train seed, but exact answers remain sparse."
+  - eval_id: "trained-heldout-v011-run-lv05-local-b299410c"
+    eval_type: "trained-heldout"
+    command: "prime eval run abugoot/meta-data-analysis-lite@0.1.1 -m meta-llama/Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss -n 16 -r 1 -c 4 -a '{\"seed\":424242,\"num_examples\":128,\"min_rows\":8,\"max_rows\":12,\"task_families\":\"sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel\"}' --max-tokens 512 --temperature 0.7 --max-retries 2 --save-results --skip-upload --output-dir episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_lv05ttq2v7kd7l628qdstxjz/trained_mixed_seed424242_llama1b_n16_v011 --abbreviated-summary --plain"
+    model: "meta-llama/Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss"
+    env_id: "abugoot/meta-data-analysis-lite"
+    env_version: "0.1.1"
+    linked_run_id: "lv05ttq2v7kd7l628qdstxjz"
+    adapter_id: "tdygoem4x7kvo97ghqcpxtss"
+    env_args:
+      seed: 424242
+      num_examples: 128
+      min_rows: 8
+      max_rows: 12
+      task_families: "sum_units_by_region,sum_revenue_by_product,count_rows_filter,max_region_revenue,diff_product_revenue,avg_unit_price_by_channel"
+    seed: 424242
+    split: "held-out-seed"
+    max_tokens: 512
+    temperature: 0.7
+    num_examples: 16
+    rollouts_per_example: 1
+    status: "completed"
+    output_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_lv05ttq2v7kd7l628qdstxjz/trained_mixed_seed424242_llama1b_n16_v011/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss/b299410c/results.jsonl"
+    avg_reward: 0.46471863189775253
+    truncation_rate: 0.0
+    error_rate: 0.0
+    avg_input_tokens: 350.1875
+    avg_output_tokens: 46.125
+    auxiliary_metrics:
+      parseable: 1.0
+      exact_one_result: 0.25
+      exact_answer: 0.125
+      answer_score: 0.3577915091970036
+      multi_candidate: 0.0
+      code_fence: 0.0625
+      output_chars: 181.0
+    notes: "Held-out eval confirms generalization of format and partial arithmetic signal, but exact-answer rate remains low."
+
+hosted_runs:
+  - run_id: "ilb7rwevow9e1nzorv00rhxz"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/ilb7rwevow9e1nzorv00rhxz"
+    config_path: "episodes/2026-06-03-meta-data-analysis-lite-001/configs/llama1b_1step_smoke_v01_mixed.toml"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-data-analysis-lite"
+    env_version: "0.1.1"
+    status: "completed"
+    max_steps: 1
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    cost_usd: 0.0078
+    final_step: 0
+    final_reward: 0.1503890700320792
+    final_truncation_rate: 0.0
+    auxiliary_metrics:
+      parseable: 0.3958333333333333
+      exact_one_result: 0.05416666666666667
+      exact_answer: 0.09583333333333334
+      answer_score: 0.10530314693703945
+      multi_candidate: 0.020833333333333332
+      code_fence: 0.075
+      output_chars: 223.16666666666663
+    notes: "Hosted smoke completed cheaply and showed nonzero reward variance."
+  - run_id: "lv05ttq2v7kd7l628qdstxjz"
+    dashboard_url: "https://app.primeintellect.ai/dashboard/training/lv05ttq2v7kd7l628qdstxjz"
+    config_path: "episodes/2026-06-03-meta-data-analysis-lite-001/configs/llama1b_20step_v011_mixed.toml"
+    model: "meta-llama/Llama-3.2-1B-Instruct"
+    env_id: "abugoot/meta-data-analysis-lite"
+    env_version: "0.1.1"
+    status: "completed"
+    created_at: "2026-06-04 01:46"
+    started_at: "2026-06-04 01:47"
+    completed_at: "2026-06-04 01:53"
+    max_steps: 20
+    batch_size: 128
+    rollouts_per_example: 8
+    max_tokens: 512
+    cost_usd: 0.10
+    final_step: 19
+    final_reward: 0.4571488381839387
+    best_logged_reward: 0.5586145129463252
+    best_logged_reward_step: 15
+    final_truncation_rate: 0.0
+    checkpoint_ids:
+      - "bpdntmq7qqsac8odiy1x4j9w"
+    adapter_ids:
+      - "tdygoem4x7kvo97ghqcpxtss"
+      - "k1ekfx56ina5agrzva9ax4mn"
+      - "o9ac2ohv104rug6wtfi4jtqx"
+    auxiliary_metrics:
+      final_parseable: 0.9921875
+      final_exact_one_result: 0.21875
+      final_exact_answer: 0.1015625
+      final_answer_score: 0.35337553424525153
+      final_multi_candidate: 0.0
+      final_code_fence: 0.03125
+      final_output_chars: 217.8046875
+    notes: "First non-trivial RL run. The final deployable step-null adapter was evaluated on train and held-out seeds."
+
 artifact_links:
+  - label: "Prime environment"
+    kind: "url"
+    url_or_path: "https://app.primeintellect.ai/dashboard/environments/abugoot/meta-data-analysis-lite"
+    notes: "Public Hub environment, latest version 0.1.1."
+  - label: "20-step Prime run"
+    kind: "url"
+    url_or_path: "https://app.primeintellect.ai/dashboard/training/lv05ttq2v7kd7l628qdstxjz"
+    notes: "First non-trivial hosted RL run."
   - label: "local env source"
     kind: "local_file"
     url_or_path: "episodes/2026-06-03-meta-data-analysis-lite-001/env/meta_data_analysis_lite.py"
-    notes: "Initial deterministic table QA environment."
+    notes: "Deterministic table QA environment."
   - label: "local tests"
     kind: "local_file"
     url_or_path: "episodes/2026-06-03-meta-data-analysis-lite-001/env/test_meta_data_analysis_lite.py"
-    notes: "Generation, parsing, reward, and diagnostic tests."
+    notes: "Generation, parsing, reward, diagnostic, and Arrow compatibility tests."
+  - label: "run-scoped trained held-out eval"
+    kind: "local_file"
+    url_or_path: "episodes/2026-06-03-meta-data-analysis-lite-001/evals/run_lv05ttq2v7kd7l628qdstxjz/trained_mixed_seed424242_llama1b_n16_v011/evals/meta-data-analysis-lite--meta-llama--Llama-3.2-1B-Instruct:tdygoem4x7kvo97ghqcpxtss/b299410c/metadata.json"
+    notes: "Held-out eval for deployed adapter from run lv05ttq2v7kd7l628qdstxjz."
 
 cost_summary:
-  total_cost_usd: 0.0
-  notes: "No hosted eval or RL run launched yet."
+  total_cost_usd: 0.1078
+  notes: "Hosted RL costs only: $0.0078 smoke plus $0.10 for the 20-step run. Eval inference token usage is recorded in metadata but not priced here."
 
 findings:
-  summary: "Initial local v0.1.0 scaffold passes deterministic generation, parser, reward, and diagnostic tests; no RL dynamics observed yet."
-  success_criteria_met: false
+  summary: "Llama 1B learns strong format compliance and partial table arithmetic on the mixed rung, but does not solve exact answers reliably."
+  success_criteria_met: true
   lessons:
-    - "Starting no-tool keeps the table-QA environment cheap and separates arithmetic reward dynamics from sandbox/tool effects."
-    - "Auxiliary metrics should distinguish exact answer learning from format/schema learning and numeric near-miss improvement."
-  failure_modes: []
+    - "The mixed table rung gives a cheap non-trivial RL signal: base held-out reward 0.0113 -> trained held-out reward 0.4647."
+    - "Parseability can saturate while exact-answer rate remains low, so exact-answer and answer-score should be logged separately from reward."
+    - "The current no-tool baseline is useful before adding tool use; tool variants should be compared against this same generator."
+    - "Mixed metadata fields in generated examples should be JSON-serialized to avoid Arrow schema failures."
+  failure_modes:
+    - "v0.1.0 mixed eval failed on Arrow-incompatible heterogeneous info metadata."
+    - "Step-specific final adapter records remained UPLOADING; the step-null final adapter was the usable deployment artifact."
+    - "The model often returns valid JSON outside required result tags, receiving partial reward but failing exact-one-result."
   reward_hacking_observed: false
-  reward_hacking_notes: ""
+  reward_hacking_notes: "No candidate stuffing or truncation-based exploit emerged. The main reward gap is shaped partial credit for near-miss arithmetic and JSON outside tags."
 
 next_steps:
-  - "Push the environment to Prime Hub after local checks pass."
-  - "Run base evals on easy and mixed rungs before hosted RL."
-  - "Launch the 1-step Llama 1B hosted smoke only after Prime evals show clean parser behavior."
+  - "Commit and push the completed first-pass episode on branch codex/meta-data-analysis-lite."
+  - "Optionally run a harder no-tool rung with 14-20 rows before model scaling."
+  - "Design a tool-enabled version over the same generator without introducing sandbox costs yet."
 
-status: "draft"
+status: "completed-first-pass"

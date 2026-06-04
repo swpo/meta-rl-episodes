@@ -1,6 +1,6 @@
 [project]
 name = "meta-data-analysis-lite"
-version = "0.1.0"
+version = "0.1.1"
 tags = ["tabular", "data-analysis", "arithmetic", "synthetic", "no-tools"]
 license = "Apache-2.0"
 description = "A deterministic small-table arithmetic environment for cheap RL probes."

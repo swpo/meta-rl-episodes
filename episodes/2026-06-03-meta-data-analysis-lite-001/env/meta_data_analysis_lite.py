@@ -242,7 +242,10 @@ def make_examples(
                     "rows": rows,
                     "num_rows": num_rows,
                     "question": question,
-                    **answer_payload,
+                    "answer_json": json.dumps(answer_payload["answer"], sort_keys=True),
+                    "answer_type": answer_payload["answer_type"],
+                    "task_family": answer_payload["task_family"],
+                    "target_json": json.dumps(answer_payload["target"], sort_keys=True),
                 },
             }
         )
